@@ -132,12 +132,14 @@
 </template>
 
 <script>
-import { mapActions, mapGetters } from 'vuex'
+import { supabase } from '../utils/supabase'
 
 export default {
   name: 'Customers',
   data() {
     return {
+      customerList: [],
+      tenant_id: 'f07a3c67-d6cb-4ed3-a0da-a5009a75ec2e',
       dialogVisible: false,
       currentPage: 1,
       pageSize: 9,
@@ -165,9 +167,6 @@ export default {
     await this.getAllCustomer()
   },
   computed: {
-    ...mapGetters({
-      customerList: 'customer/getCustomerList'
-    }),
     paginatedData() {
       const start = (this.currentPage - 1) * this.pageSize
       const end = start + this.pageSize
@@ -191,12 +190,55 @@ export default {
     }
   },
   methods: {
-    ...mapActions({
-      getAllCustomer: 'customer/getAllCustomer',
-      addCustomer: 'customer/addCustomer',
-      updateCustomer: 'customer/updateCustomer',
-      deleteCustomer: 'customer/deleteCustomer'
-    }),
+    async getAllCustomer() {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('tenant_id', this.tenant_id)
+
+      if (error) {
+        console.error('Error fetching customers:', error)
+        this.$message.error('Müşteriler yüklenirken bir hata oluştu.')
+      } else {
+        this.customerList = data.map((item) => ({
+          id: item.id,
+          fullName: item.full_name,
+          phone: item.phone,
+          address: item.address || '',
+          hasBalance: true, // Defaulting to true as it's not in db but required for UI flow
+          tenant_id: item.tenant_id
+        }))
+      }
+    },
+    async addCustomer(payload) {
+      const { error } = await supabase.from('customers').insert([
+        {
+          full_name: payload.fullName,
+          phone: payload.phone,
+          address: payload.address,
+          tenant_id: this.tenant_id
+        }
+      ])
+      if (error) throw error
+      await this.getAllCustomer()
+    },
+    async updateCustomer(payload) {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          full_name: payload.fullName,
+          phone: payload.phone,
+          address: payload.address
+        })
+        .eq('id', payload.id)
+      if (error) throw error
+      await this.getAllCustomer()
+    },
+    async deleteCustomer(id) {
+      const { error } = await supabase.from('customers').delete().eq('id', id)
+      if (error) throw error
+      await this.getAllCustomer()
+    },
     handlePageChange(page) {
       this.currentPage = page
     },
@@ -258,23 +300,33 @@ export default {
         if (!valid) return
 
         if (this.editingCustomer) {
-          await this.updateCustomer(this.formData)
-          this.$notify({
-            title: 'Başarılı',
-            type: 'success',
-            message: 'Müşteri bilgileri güncellendi!',
-            duration: 3000,
-            position: 'top-right'
-          })
+          try {
+            await this.updateCustomer(this.formData)
+            this.$notify({
+              title: 'Başarılı',
+              type: 'success',
+              message: 'Müşteri bilgileri güncellendi!',
+              duration: 3000,
+              position: 'top-right'
+            })
+          } catch (error) {
+            this.$message.error('Müşteri güncellenirken hata oluştu.')
+            console.error(error)
+          }
         } else {
-          await this.addCustomer(this.formData)
-          this.$notify({
-            title: 'Başarılı',
-            type: 'success',
-            message: 'Müşteri oluşturuldu!',
-            duration: 3000,
-            position: 'top-right'
-          })
+          try {
+            await this.addCustomer(this.formData)
+            this.$notify({
+              title: 'Başarılı',
+              type: 'success',
+              message: 'Müşteri oluşturuldu!',
+              duration: 3000,
+              position: 'top-right'
+            })
+          } catch (error) {
+            this.$message.error('Müşteri eklenirken hata oluştu.')
+            console.error(error)
+          }
         }
 
         this.dialogVisible = false
@@ -282,7 +334,7 @@ export default {
     },
     open(row) {
       this.$confirm(
-        'Ender İmen adlı müşteriyi, silmek istediğinden emin misiniz?',
+        `${row.fullName} adlı müşteriyi, silmek istediğinden emin misiniz?`,
         'Müşteri Silme İşlemi',
         {
           distinguishCancelAndClose: true,
@@ -291,14 +343,19 @@ export default {
         }
       )
         .then(async () => {
-          await this.deleteCustomer(row.id)
-          this.$notify({
-            title: 'Başarılı',
-            type: 'success',
-            message: 'Müşteri başarıyla silindi!',
-            duration: 3000,
-            position: 'top-right'
-          })
+          try {
+            await this.deleteCustomer(row.id)
+            this.$notify({
+              title: 'Başarılı',
+              type: 'success',
+              message: 'Müşteri başarıyla silindi!',
+              duration: 3000,
+              position: 'top-right'
+            })
+          } catch (error) {
+            this.$message.error('Müşteri silinirken hata oluştu.')
+            console.error(error)
+          }
         })
         .catch((action) => {
           this.$notify({
