@@ -11,6 +11,24 @@ export default {
     },
     getCurrentSeasonNameById() {
       return seasonId => this.getSeasonList.find(season => season.value == seasonId)?.label;
+    },
+    currentTenantId() {
+      return localStorage.getItem('tenant_id')
+    },
+    userFullName() {
+      return localStorage.getItem('user_full_name')
+    },
+    tenantName() {
+      return localStorage.getItem('tenant_name')
+    },
+    tenantLogoUrl() {
+      return localStorage.getItem('tenant_logo_url')
+    },
+    userRole() {
+      return localStorage.getItem('user_role')
+    },
+    currentUserId() {
+      return localStorage.getItem('user_id')
     }
   },
   methods: {

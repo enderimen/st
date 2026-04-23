@@ -115,7 +115,7 @@ export default {
   data() {
     return {
       seasonList: [],
-      tenant_id: 'f07a3c67-d6cb-4ed3-a0da-a5009a75ec2e',
+      seasons: [],
       currentYear: '',
       originalYear: '',
       dialogVisible: false,
@@ -180,7 +180,7 @@ export default {
       const { data, error } = await supabase
         .from('seasons')
         .select('*')
-        .eq('tenant_id', this.tenant_id)
+        .eq('tenant_id', this.currentTenantId)
 
       if (error) {
         console.error('Error fetching seasons:', error)
@@ -199,7 +199,7 @@ export default {
       const { error } = await supabase.from('seasons').insert([
         {
           name: payload.name,
-          tenant_id: this.tenant_id
+          tenant_id: this.currentTenantId
         }
       ])
       if (error) throw error

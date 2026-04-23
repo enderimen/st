@@ -8,10 +8,11 @@ let mainWindow
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 390,
-    height: 420,
+    height: 480,
     show: false,
     resizable: false,
     autoHideMenuBar: true,
+    center: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -20,7 +21,10 @@ function createWindow() {
     }
   })
 
-  mainWindow.on('ready-to-show', () => mainWindow.show())
+  mainWindow.on('ready-to-show', () => {
+    mainWindow.maximize()
+    mainWindow.show()
+  })
 
   mainWindow.webContents.setWindowOpenHandler(details => {
     shell.openExternal(details.url)
@@ -39,16 +43,9 @@ function createWindow() {
 
 // Login sonrası ana sayfaya geç
 export function goToMainPage() {
-  
   if (!mainWindow) return;
-  mainWindow.setFullScreen(true);
-  mainWindow.resizable = true;
-
-  /* if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '#/')
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/' })
-  } */
+  mainWindow.setResizable(true);
+  mainWindow.maximize();
 }
 
 // IPC listener

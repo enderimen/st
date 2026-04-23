@@ -17,86 +17,117 @@
     </el-upload>
 
     <el-form class="form-size" label-position="top">
-      <el-form-item label="Kullanıcı adı" class="custom-width">
-        <el-input v-model="profile.username" placeholder="Kullanıcı adınızı girin" />
+      <el-form-item label="Ad Soyad" class="custom-width">
+        <el-input v-model="profile.full_name" placeholder="Adınızı ve soyadınızı girin" />
       </el-form-item>
-      <el-form-item label="Şirket adı" class="custom-width">
-        <el-input v-model="profile.companyName" placeholder="Şirket adınızı girin" />
+      <el-form-item label="Şirket" class="custom-width">
+        <el-input v-model="profile.tenant_name" disabled />
       </el-form-item>
-      <el-button type="success" @click="saveProfile" :loading="isCompleted">Kaydet</el-button>
+      <el-form-item label="E-posta" class="custom-width">
+        <el-input v-model="profile.email" disabled />
+      </el-form-item>
+      <el-form-item label="Yetki / Rol" class="custom-width">
+        <el-input v-model="profile.role" disabled />
+      </el-form-item>
+      <el-button type="success" @click="saveProfile" :loading="loading">Kaydet</el-button>
     </el-form>
   </el-card>
 </template>
 
 <script>
-import { mapGetters, mapActions } from 'vuex'
+import { supabase } from '../utils/supabase'
+import globalMixin from '../mixin/global.mixin.js'
 
 export default {
   name: 'Profile',
+  mixins: [globalMixin],
   data() {
     return {
       profile: {
-        username: '',
-        companyName: '',
+        full_name: '',
+        tenant_name: '',
+        email: '',
+        role: '',
         imageUrl: ''
       },
-      isCompleted: false,
+      loading: false,
       selectedFile: null
     }
   },
-  mounted() {
-    this.profile.username = this.getProfileDetail.username;
-    this.profile.companyName = this.getProfileDetail.companyName;
-    this.profile.imageUrl = this.getProfileDetail.imageUrl;
-  },
-  computed: {
-    ...mapGetters({
-      getUser: 'auth/getUser',
-      getProfileDetail: 'user/getProfileDetail',
-    })
+  async mounted() {
+    await this.fetchProfile()
   },
   methods: {
-    ...mapActions({
-      updateProfile: 'user/updateProfile'
-    }),
+    async fetchProfile() {
+      const {
+        data: { user }
+      } = await supabase.auth.getUser()
+      if (user) {
+        this.profile.email = user.email
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+
+        if (profile) {
+          this.profile.full_name = profile.full_name
+          this.profile.role = profile.role
+
+          // Şirket adını çek
+          const { data: tenant } = await supabase
+            .from('tenants')
+            .select('name')
+            .eq('id', profile.tenant_id)
+            .single()
+
+          if (tenant) {
+            this.profile.tenant_name = tenant.name
+            localStorage.setItem('tenant_name', tenant.name)
+          }
+
+          localStorage.setItem('user_full_name', profile.full_name)
+        }
+      }
+    },
     beforeAvatarUpload(file) {
-      const isImage = ['image/jpeg', 'image/png'].includes(file.type);
-      const isLt2M = file.size / 1024 / 1024 < 2;
+      const isImage = ['image/jpeg', 'image/png'].includes(file.type)
+      const isLt2M = file.size / 1024 / 1024 < 2
 
-      if (!isImage) this.$message.error('Yalnızca JPG/PNG dosyaları yükleyebilirsiniz!');
-      if (!isLt2M) this.$message.error('Resim boyutu 2MB\'den küçük olmalıdır!');
+      if (!isImage) this.$message.error('Yalnızca JPG/PNG dosyaları yükleyebilirsiniz!')
+      if (!isLt2M) this.$message.error("Resim boyutu 2MB'den küçük olmalıdır!")
 
-      return isImage && isLt2M;
+      return isImage && isLt2M
     },
     handleFileChange(file) {
-      this.selectedFile = file.raw;
-      this.profile.imageUrl = URL.createObjectURL(file.raw);
+      this.selectedFile = file.raw
+      this.profile.imageUrl = URL.createObjectURL(file.raw)
     },
     async saveProfile() {
-      const userId = this.getUser.id;
-
       try {
-        this.isCompleted = true;
-        const formData = new FormData();
-        if (this.selectedFile) formData.append('file', this.selectedFile);
-        if (this.profile.companyName) formData.append('companyName', this.profile.companyName);
-        if (this.profile.username) formData.append('username', this.profile.username);
+        this.loading = true
+        const {
+          data: { user }
+        } = await supabase.auth.getUser()
 
-        const response = await this.updateProfile({ userId, formData });
-        const { profileImageUrl, companyName, username } = response.data;
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            full_name: this.profile.full_name
+          })
+          .eq('id', user.id)
 
-        if (response.isSuccess) {
-          this.profile.imageUrl = profileImageUrl;
-          this.profile.companyName = companyName;
-          this.profile.username = username;
-          this.$message.success(response.message || 'Profil bilgileri başarıyla güncellendi!');
-        } else {
-          this.$message.error(response.message || 'Profil güncellenirken bir hata oluştu!');
-        }
-        this.isCompleted = false;
+        if (error) throw error
+
+        localStorage.setItem('user_full_name', this.profile.full_name)
+
+        this.$message.success('Profil bilgileri başarıyla güncellendi!')
       } catch (err) {
-        console.error(err);
-        this.$message.error('Profil güncellenirken bir hata oluştu!');
+        console.error(err)
+        this.$message.error('Profil güncellenirken bir hata oluştu!')
+      } finally {
+        this.loading = false
       }
     }
   }

@@ -122,13 +122,15 @@
 
 <script>
 import { supabase } from '../utils/supabase'
+import globalMixin from '../mixin/global.mixin.js'
 
 export default {
   name: 'Products',
+  mixins: [globalMixin],
   data() {
     return {
       productList: [],
-      tenant_id: 'f07a3c67-d6cb-4ed3-a0da-a5009a75ec2e',
+      products: [],
       dialogVisible: false,
       currentPage: 1,
       pageSize: 11,
@@ -157,7 +159,7 @@ export default {
     }
   },
   async mounted() {
-    console.log(this.tenant_id)
+    console.log(this.currentTenantId)
     await this.getAllProductTypes()
   },
   computed: {
@@ -200,7 +202,7 @@ export default {
       const { data, error } = await supabase
         .from('product_types')
         .select('*')
-        .eq('tenant_id', this.tenant_id)
+        .eq('tenant_id', this.currentTenantId)
 
       if (error) {
         console.error('Error fetching products:', error)
@@ -226,7 +228,7 @@ export default {
           category: payload.category,
           unit_weight: payload.unitWeight,
           is_grassy: payload.isGrass,
-          tenant_id: this.tenant_id
+          tenant_id: this.currentTenantId
         }
       ])
       if (error) throw error

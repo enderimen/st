@@ -133,13 +133,15 @@
 
 <script>
 import { supabase } from '../utils/supabase'
+import globalMixin from '../mixin/global.mixin.js'
 
 export default {
   name: 'Customers',
+  mixins: [globalMixin],
   data() {
     return {
       customerList: [],
-      tenant_id: 'f07a3c67-d6cb-4ed3-a0da-a5009a75ec2e',
+      customerList: [],
       dialogVisible: false,
       currentPage: 1,
       pageSize: 9,
@@ -191,24 +193,26 @@ export default {
   },
   methods: {
     async getAllCustomer() {
-      const { data, error } = await supabase
+      // Müşterileri ve onlara ait carileri çekelim
+      const { data: customers, error: cErr } = await supabase
         .from('customers')
-        .select('*')
-        .eq('tenant_id', this.tenant_id)
+        .select('*, customer_balances(id)')
+        .eq('tenant_id', this.currentTenantId)
 
-      if (error) {
-        console.error('Error fetching customers:', error)
+      if (cErr) {
+        console.error('Error fetching customers:', cErr)
         this.$message.error('Müşteriler yüklenirken bir hata oluştu.')
-      } else {
-        this.customerList = data.map((item) => ({
-          id: item.id,
-          fullName: item.full_name,
-          phone: item.phone,
-          address: item.address || '',
-          hasBalance: true, // Defaulting to true as it's not in db but required for UI flow
-          tenant_id: item.tenant_id
-        }))
+        return
       }
+
+      this.customerList = customers.map((item) => ({
+        id: item.id,
+        fullName: item.full_name,
+        phone: item.phone,
+        address: item.address || '',
+        hasBalance: item.customer_balances && item.customer_balances.length > 0,
+        tenant_id: item.tenant_id
+      }))
     },
     async addCustomer(payload) {
       const { error } = await supabase.from('customers').insert([
@@ -216,7 +220,7 @@ export default {
           full_name: payload.fullName,
           phone: payload.phone,
           address: payload.address,
-          tenant_id: this.tenant_id
+          tenant_id: this.currentTenantId
         }
       ])
       if (error) throw error

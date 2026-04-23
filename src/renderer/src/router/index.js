@@ -53,12 +53,26 @@ const router = new Router({
   ]
 });
 
+import { supabase } from '../utils/supabase'
+
 // Router guard
-router.beforeEach((to, from, next) => {
-  const isAuthenticated = !!localStorage.getItem('token');
-  if (to.meta.requiresAuth && !isAuthenticated) next({ name: 'Login' });
-  else if (to.name === 'Login' && isAuthenticated) next({ name: 'Home' });
-  else next();
+router.beforeEach(async (to, from, next) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  const hasTenant = !!localStorage.getItem('tenant_id');
+  
+  const isAuthenticated = session && hasTenant;
+
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    // Eğer oturum yoksa her şeyi temizle ve logine gönder
+    localStorage.removeItem('tenant_id');
+    localStorage.removeItem('user_id');
+    next({ name: 'Login' });
+  } else if (to.name === 'Login' && isAuthenticated) {
+    // Giriş yapmışsa logine gitmesin
+    next({ name: 'Home' });
+  } else {
+    next();
+  }
 });
 
 export default router;

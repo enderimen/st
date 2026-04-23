@@ -171,10 +171,10 @@
     <el-pagination
       background
       layout="prev, pager, next"
-      :total="filteredData?.length"
+      :total="filteredData.length"
       :page-size="pageSize"
       :current-page="currentPage"
-      @current-change="handlePageChange"
+      @current-change="currentPage = $event"
       style="margin-top: 20px; text-align: center"
     />
 
@@ -427,11 +427,11 @@
 </template>
 
 <script>
-import moment from 'moment';
-import { formatNumber } from '../utils/helpers';
-import PriceInput from './../components/PriceInput.vue';
-import { mapActions, mapGetters } from 'vuex';
-import globalMixin from '../mixin/global.mixin.js';
+import moment from 'moment'
+import { formatNumber } from '../utils/helpers'
+import PriceInput from './../components/PriceInput.vue'
+import { supabase } from '../utils/supabase'
+import globalMixin from '../mixin/global.mixin.js'
 
 export default {
   name: 'Accounting',
@@ -446,12 +446,16 @@ export default {
       pageSize: 8,
       outputDetail: null,
       filter: {
-        search: "",
-        season: "",
-        receivedDate: "",
-        isClosing: null
+        search: '',
+        season: '',
+        receivedDate: '',
+        isClosing: 'Tümü'
       },
-      originalData: {   // servisten gelen
+      customerBalanceList: [],
+      seasonList: [],
+      search: '',
+      customerDetail: null,
+      originalData: {
         totalKg: 0,
         remainingKg: 0,
       },
@@ -462,34 +466,37 @@ export default {
         season: "",
         totalKg: 0,
         remainingKg: 0,
-        isClosing: null,
-        purchasedAmount: "",
-        paymentType: "",
+        isClosing: false,
+        purchasedAmount: 0,
+        paymentType: "Nakit",
         productTypePayload: {
-          herbTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 }, // otlu 
-          plainTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 }, // sade
-          plainBrine: {  kg2: 0, kg3: 0, kg5: 0 }, // salamura 
-          herbBrine: {  kg2: 0, kg3: 0, kg5: 0 } // otlu salamura 
+          herbTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 }, 
+          plainTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 }, 
+          plainBrine: {  kg2: 0, kg3: 0, kg5: 0 }, 
+          herbBrine: {  kg2: 0, kg3: 0, kg5: 0 } 
         },
       },
     }
   },
-  mounted () {
-    this.getAllCustomerBalance();
-    setTimeout(() => {
-      if (this.$route.params?.type == 'add') {
-        this.isOpenDialog('add');
-      }
-    }, 500);
+  async mounted() {
+    await this.fetchSeasons()
+    await this.getAllCustomerBalance()
 
-    this.filter.season = this.$route.params?.season;
-    this.filter.search = this.$route.params?.customerName;
+    // Eğer bir yönlendirme ile gelindiyse (Cari Oluştur gibi)
+    if (this.$route.params?.type === 'add' || this.$route.params?.customerId) {
+      await this.isOpenDialog('add')
+    }
+
+    this.filter.season = this.$route.params?.season || ''
+    this.filter.search = this.$route.params?.customerName || ''
   },
   computed: {
-    ...mapGetters({
-      getCustomerBalanceList: 'customer/getCustomerBalanceList',
-      getCustomerDetail: 'customer/getCustomerDetail'
-    }),
+    getSeasonList() {
+      return this.seasonList.map((s) => ({
+        label: s.name,
+        value: s.id
+      }))
+    },
     getPaymentNote() {
       return `${this.formData.fullName}, ${this.formData.totalKg} KG ürün karşılığında ${ this.formData.paymentType == "1" ? 'Havale / EFT' : 'Nakit' } yoluyla ${this.getFormatedPurchasedAmount}₺ ödeme yapmıştır.`;
     },
@@ -497,26 +504,22 @@ export default {
       return this.editingAccounting ? (this.originalData.remainingKg != 0 && !this.formData.isClosing) || this.calcRemainingKG < 0 : this.calcRemainingKG < 0;
     },
     filteredData() {
-      // Filtreleme
-      const filtered = this.getCustomerBalanceList?.filter(item => {
+      const filtered = this.customerBalanceList.filter((item) => {
         const matchesSearch = this.filter.search
-          ? item.name.toLowerCase().includes(this.filter?.search.toLowerCase())
-          : true;
+          ? item.name?.toLowerCase().includes(this.filter.search.toLowerCase())
+          : true
 
-        const matchesSeason = this.filter.season
-          ? item.seasonId == this.filter.season
-          : true;
+        const matchesSeason = this.filter.season ? item.seasonId === this.filter.season : true
 
         const matchesDate = this.filter.receivedDate
-          ? moment(item.createdAt, 'DD.MM.YYYY').isSame(moment(this.filter.receivedDate), 'day')
-          : true;
-        
-        const matchesState = this.filter.isClosing === 'Tümü' || this.filter.isClosing === null || this.filter.isClosing === undefined
-          ? true
-          : item.isClosing !== this.filter.isClosing;
+          ? moment(item.createdAt).isSame(moment(this.filter.receivedDate), 'day')
+          : true
 
-        return matchesSearch && matchesSeason && matchesDate && matchesState;
-      });
+        const matchesState =
+          this.filter.isClosing === 'Tümü' ? true : item.isClosing === !this.filter.isClosing
+
+        return matchesSearch && matchesSeason && matchesDate && matchesState
+      })
 
       // Oluşturulma tarihine göre azalan sıralama (en yenisi en üstte)
       return filtered?.sort((a, b) => {
@@ -587,46 +590,79 @@ export default {
     }
   },
   methods: {
-    ...mapActions({
-      getAllCustomerBalance: 'customer/getAllCustomerBalance',
-      closeCustomerBalance: 'customer/closeCustomerBalance',
-      getCustomer: 'customer/getCustomer',
-      addCustomerBalance: 'customer/addCustomerBalance',
-      updateCustomerBalance: 'customer/updateCustomerBalance',
-    }),
-    handlePageChange(page) {
-      this.currentPage = page;
-    },
     handleClick(row) {
-      this.$router.push({ name: "AccountingProcess", params: { customerName: row.name }});
+      this.$router.push({ name: 'AccountingProcess', params: { customerName: row.name } })
     },
     useBalance(row) {
-      this.$router.push({ name: "AccountingProcess", params: { type: 'add', user: row }});
+      this.$router.push({ name: 'AccountingProcess', params: { type: 'add', user: row } })
+    },
+    async fetchSeasons() {
+      const { data } = await supabase.from('seasons').select('*').eq('tenant_id', this.currentTenantId)
+      this.seasonList = data || []
+    },
+    async getAllCustomerBalance() {
+      const { data, error } = await supabase
+        .from('customer_balances')
+        .select(`
+          *,
+          customer:customers(full_name, phone, address),
+          season:seasons(name)
+        `)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error(error)
+        this.$message.error('Cariler yüklenirken hata oluştu.')
+        return
+      }
+
+      this.customerBalanceList = data.map((item) => ({
+        id: item.id,
+        customerId: item.customer_id,
+        name: item.customer?.full_name,
+        phone: item.customer?.phone,
+        address: item.customer?.address,
+        seasonId: item.season_id,
+        season: item.season?.name,
+        totalKg: item.total_kg_quota,
+        remainingKg: item.remaining_kg_quota,
+        purchasedAmount: item.total_paid_amount,
+        paymentType: item.payment_type,
+        isClosing: item.customer?.is_closed, // Müşteri bazlı mı yoksa bakiye bazlı mı kapanıyor? Tabloda bakiye bazlı bir is_closed yoktu, müşteriden aldım.
+        createdAt: item.created_at,
+        hasTransaction: true // Detay ekranı için
+      }))
     },
     async isOpenDialog(type, row = {}) {
-      this.editingAccounting = type === 'edit';
-      this.outputDetail = row;
+      this.editingAccounting = type === 'edit'
+      this.outputDetail = row
       if (this.editingAccounting) {
-        this.fillForm();
+        this.fillForm()
       } else {
-        const customerId = row.customerId ?? this.$route.params?.customerId;
-        
-        await this.getCustomer(customerId);
-        this.resetFormData();
+        const customerId = row.customerId || this.$route.params?.customerId
+        if (customerId) {
+          const { data } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', customerId)
+            .single()
+          this.customerDetail = data
+        }
+        this.resetFormData()
       }
-      this.dialogVisible = true;
+      this.dialogVisible = true
     },
     resetFormData() {
       this.formData = {
-        fullName: "", 
-        phone: "", 
-        address: "",
-        season: "",
+        fullName: this.customerDetail?.full_name || '',
+        phone: this.customerDetail?.phone || '',
+        address: this.customerDetail?.address || '',
+        season: '',
         totalKg: 0,
         remainingKg: 0,
-        isClosing: null,
-        purchasedAmount: "",
-        paymentType: "",
+        isClosing: false,
+        purchasedAmount: 0,
+        paymentType: 'Nakit',
         productTypePayload: {
           herbTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 },
           plainTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 },
@@ -635,109 +671,109 @@ export default {
         }
       }
 
-      this.originalData.totalKg = 0;
-      this.originalData.remainingKg = 0;
+      this.originalData.totalKg = 0
+      this.originalData.remainingKg = 0
 
-      this.formData.fullName = this.getCustomerDetail.fullName;
-      this.formData.phone = this.getCustomerDetail.phone;
-      const getYear = new Date().getFullYear().toString();
-      this.formData.season = this.getCurrentSeasonIdByName(getYear);
+      // Mevcut yılı sezon listesinden bulalım
+      const currentYear = new Date().getFullYear().toString()
+      const foundSeason = this.getSeasonList?.find((s) => s.label.includes(currentYear))
+      if (foundSeason) this.formData.season = foundSeason.value
     },
     fillForm() {
-      this.formData.fullName = this.outputDetail?.name;
-      this.formData.phone = this.outputDetail?.phone;
-      this.formData.season = this.outputDetail?.seasonId.toString()
-      this.formData.isClosing = !this.outputDetail?.isClosing;
-      this.formData.paymentType = this.outputDetail?.paymentType.toString();
-      this.formData.totalKg = this.outputDetail.totalKg;
+      if (!this.outputDetail) return
 
-      this.originalData.totalKg = this.outputDetail.totalKg;
-      this.originalData.remainingKg = this.outputDetail.remainingKg;
-      this.formData.purchasedAmount = this.outputDetail.purchasedAmount;
+      this.formData.fullName = this.outputDetail.name
+      this.formData.phone = this.outputDetail.phone
+      this.formData.season = this.outputDetail.seasonId?.toString()
+      this.formData.isClosing = !this.outputDetail.isClosing
+      this.formData.paymentType = this.outputDetail.paymentType?.toString() || 'Nakit'
+      this.formData.totalKg = this.outputDetail.totalKg || 0
+
+      this.originalData.totalKg = this.outputDetail.totalKg || 0
+      this.originalData.remainingKg = this.outputDetail.remainingKg || 0
+      this.formData.purchasedAmount = this.outputDetail.purchasedAmount || 0
     },
     async saveAccounting() {
-      if (this.editingAccounting) {
-        const payload = {
-          id: this.outputDetail.id,
-          customerId: this.outputDetail.customerId,
-          customerName: this.formData.fullName,
-          phone: this.formData.phone,
-          createdDate: this.outputDetail.createdAt,
-          totalKg: this.formData.totalKg,
-          isClosed: !this.formData.isClosing,
-          remainingKg: this.calcRemainingKG,
-          seasonId: Number(this.formData.season),
-          seasonName: this.getCurrentSeasonNameById(this.formData.season),
-          purchasedAmount: this.formData.purchasedAmount,
-          paymentType: Number(this.formData.paymentType),
-          desc: this.getPaymentNote,
-        };
-        
-        await this.updateCustomerBalance(payload);
-
-        this.$notify({
-          title: 'Başarılı',
-          type: 'success',
-          message: 'Müşteri carisi güncellendi!',
-          duration: 3000,
-          position: 'top-right',
-        });
-      } else {
-        const paylaod = {
-          customerId: this.$route.params?.customerId,
-          customerName: this.formData.fullName,
-          totalKg: this.formData.totalKg,
-          isClosed: false,
-          remainingKg: this.calcRemainingKG,
-          seasonId: this.formData.season,
-          phone: this.formData.phone,
-          desc: this.getPaymentNote,
-          seasonName: this.getCurrentSeasonNameById(this.formData.season),
-          hasTransaction: false,
-          purchasedAmount: this.formData.purchasedAmount,
-          paymentType: Number(this.formData.paymentType)
-        }
-        
-        await this.addCustomerBalance(paylaod);
-        
-        this.$notify({
-          title: 'Başarılı',
-          type: 'success',
-          message: 'Müşteri carisi oluşturuldu!',
-          duration: 3000,
-          position: 'top-right',
-        });
+      if (!this.formData.season) {
+        this.$message.warning('Lütfen bir sezon seçin.')
+        return
       }
 
-      this.closePopup();
-    },
-    open(row, type) {
-      const status = type == 'close' ? 'kapatmak' : 'aktifleştirmek'; 
-      this.$confirm(`${row.name} adlı müşterinin carisini ${status} istediğinden emin misiniz?`, 'Cari Düzenleme İşlemi', {
-        distinguishCancelAndClose: true,
-        confirmButtonText: 'Onayla',
-        cancelButtonText: 'İptal Et',
-      })
-      .then(async () => {
-        await this.closeCustomerBalance({id: row.id, status: !row.isClosing});
+      const payload = {
+        customer_id: this.editingAccounting
+          ? this.outputDetail.customerId
+          : (this.$route.params?.customerId || this.customerDetail?.id),
+        season_id: this.formData.season,
+        total_kg_quota: this.formData.totalKg,
+        remaining_kg_quota: this.editingAccounting
+          ? this.formData.totalKg - (this.outputDetail.totalKg - this.outputDetail.remainingKg)
+          : this.formData.totalKg,
+        total_paid_amount: this.formData.purchasedAmount,
+        payment_type: this.formData.paymentType,
+        tenant_id: this.currentTenantId
+      }
 
-        this.$notify({
-          title: 'Başarılı',
-          type: 'success',
-          message: 'Cari başarıyla düzenlendi!',
-          duration: 3000,
-          position: 'top-right',
-        });
-      })
-      .catch(action => {
-        this.$notify({
-          title: 'Bilgi',
-          type: 'info',
-          message: 'İşlem iptal edildi',
-          duration: 3000,
-          position: 'top-right',
+      try {
+        if (this.editingAccounting) {
+          const { error } = await supabase
+            .from('customer_balances')
+            .update(payload)
+            .eq('id', this.outputDetail.id)
+          if (error) throw error
+          this.$notify({
+            title: 'Başarılı',
+            type: 'success',
+            message: 'Müşteri carisi güncellendi!'
+          })
+        } else {
+          const { error } = await supabase.from('customer_balances').insert([payload])
+          if (error) throw error
+          this.$notify({
+            title: 'Başarılı',
+            type: 'success',
+            message: 'Müşteri carisi oluşturuldu!'
+          })
+        }
+        await this.getAllCustomerBalance()
+        this.closePopup()
+      } catch (err) {
+        console.error(err)
+        this.$message.error('İşlem sırasında hata oluştu.')
+      }
+    },
+    async open(row, type) {
+      const status = type === 'close' ? 'kapatmak' : 'aktifleştirmek'
+      this.$confirm(
+        `${row.name} adlı müşterinin carisini ${status} istediğinden emin misiniz?`,
+        'Cari Düzenleme İşlemi',
+        {
+          distinguishCancelAndClose: true,
+          confirmButtonText: 'Onayla',
+          cancelButtonText: 'İptal Et'
+        }
+      )
+        .then(async () => {
+          const { error } = await supabase
+            .from('customers')
+            .update({ is_closed: type === 'close' })
+            .eq('id', row.customerId)
+
+          if (error) throw error
+
+          this.$notify({
+            title: 'Başarılı',
+            type: 'success',
+            message: 'Cari başarıyla düzenlendi!'
+          })
+          await this.getAllCustomerBalance()
         })
-      });
+        .catch(() => {
+          this.$notify({
+            title: 'Bilgi',
+            type: 'info',
+            message: 'İşlem iptal edildi'
+          })
+        })
     },
     getSummaries(param) {
       const { columns, data } = param;

@@ -83,9 +83,8 @@
       },
       handleFocus() {
         this.isFocused = true;
-        // formatlı görünümü düz sayıya çevir
         const num = this.normalizeToNumber(this.value);
-        this.display = num ? String(num.toFixed(this.decimals)).replace(/\.?0+$/, (m)=> m.startsWith('.')?'.'+m.slice(1):'') : "";
+        this.display = num ? String(Number(num.toFixed(this.decimals))) : "";
       },
       handleBlur() {
         this.isFocused = false;

@@ -3,7 +3,7 @@
     <el-card class="login-card">
       <div class="login-header">
         <h2 class="title">Hoş Geldiniz!</h2>
-        <p class="desc">{{ getProfileDetail.companyName }} | Stok Takip Programı</p>
+        <p class="desc">Stok Takip Programı</p>
       </div>
 
       <el-alert
@@ -27,10 +27,10 @@
       </el-alert>
 
       <el-form :model="loginForm" ref="loginForm" :rules="rules" label-position="top">
-        <el-form-item prop="username">
+        <el-form-item prop="email">
           <el-input
-            v-model="loginForm.username"
-            placeholder="Kullanıcı adınızı girin"
+            v-model="loginForm.email"
+            placeholder="E-posta adresinizi girin"
             autocomplete="off"
           ></el-input>
         </el-form-item>
@@ -42,6 +42,7 @@
             placeholder="Şifrenizi girin"
             autocomplete="off"
             show-password
+            @keyup.enter.native="handleLogin"
           >
           </el-input>
         </el-form-item>
@@ -62,7 +63,7 @@
   </div>
 </template>
 <script>
-import { mapActions, mapGetters } from 'vuex'
+import { supabase } from '../utils/supabase'
 
 export default {
   name: 'Login',
@@ -72,11 +73,18 @@ export default {
       isOnline: navigator.onLine,
       showOnlineMessage: false,
       loginForm: {
-        username: 'senkoylum',
-        password: '123456'
+        email: '',
+        password: ''
       },
       rules: {
-        username: [{ required: true, message: 'Kullanıcı adı gerekli', trigger: 'blur' }],
+        email: [
+          { required: true, message: 'E-posta adresi gerekli', trigger: 'blur' },
+          {
+            type: 'email',
+            message: 'Geçerli bir e-posta adresi girin',
+            trigger: ['blur', 'change']
+          }
+        ],
         password: [{ required: true, message: 'Şifre gerekli', trigger: 'blur' }]
       }
     }
@@ -89,19 +97,10 @@ export default {
     window.removeEventListener('online', this.handleOnline)
     window.removeEventListener('offline', this.handleOffline)
   },
-  computed: {
-    ...mapGetters({
-      getProfileDetail: 'user/getProfileDetail'
-    })
-  },
   methods: {
-    ...mapActions({
-      login: 'auth/login'
-    }),
     handleOnline() {
       this.isOnline = true
       this.showOnlineMessage = true
-
       setTimeout(() => {
         this.showOnlineMessage = false
       }, 2000)
@@ -113,36 +112,72 @@ export default {
       this.$refs.loginForm.validate(async (valid) => {
         if (valid) {
           this.loading = true
-
           try {
-            const { accessToken } = await this.login(this.loginForm)
+            const { data, error } = await supabase.auth.signInWithPassword({
+              email: this.loginForm.email,
+              password: this.loginForm.password
+            })
 
-            if (accessToken) {
+            if (error) throw error
+
+            if (data?.user) {
+              // Profil bilgilerini çek
+              const { data: profiles, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', data.user.id)
+
+              if (profileError) throw profileError
+
+              if (!profiles || profiles.length === 0) {
+                this.$notify({
+                  title: 'Profil Eksik',
+                  type: 'warning',
+                  message: 'Kullanıcı profiliniz bulunamadı. Lütfen yöneticiye başvurun.',
+                  duration: 5000
+                })
+                this.loading = false
+                return
+              }
+
+              const profile = profiles[0]
+
+              // Şirket bilgisini çek
+              const { data: tenants, error: tenantError } = await supabase
+                .from('tenants')
+                .select('name, logo_url')
+                .eq('id', profile.tenant_id)
+
+              if (tenantError) throw tenantError
+
+              const tenant = tenants?.[0]
+
+              // Bilgileri sakla
+              localStorage.setItem('tenant_id', profile.tenant_id)
+              localStorage.setItem('tenant_name', tenant ? tenant.name : 'Tanımsız Şirket')
+              localStorage.setItem('tenant_logo_url', tenant?.logo_url || '')
+              localStorage.setItem('user_full_name', profile.full_name)
+              localStorage.setItem('user_role', profile.role)
+              localStorage.setItem('user_id', profile.id)
+
+              this.$notify({
+                title: 'Başarılı',
+                type: 'success',
+                message: `Hoş geldiniz, ${profile.full_name}`,
+                duration: 2000
+              })
+
               window.api.send('login-success')
               this.$router.push({ name: 'Home' })
-            } else {
-              this.$notify({
-                title: 'Başarısız',
-                type: 'error',
-                message: 'Lütfen bilgilerinizi kontrol edin!',
-                duration: 3000,
-                position: 'top-right'
-              })
-              this.loading = false
-              return
             }
           } catch (error) {
-            if (err.response && err.response.status === 401) {
-              const msg = err.response.data?.message || 'Yetkisiz giriş'
-              this.$notify({
-                title: 'Başarısız',
-                type: 'error',
-                message: msg,
-                duration: 3000,
-                position: 'top-right'
-              })
-              console.error(msg)
-            }
+            console.error('Login error:', error)
+            this.$notify({
+              title: 'Hata',
+              type: 'error',
+              message: error.message || 'Giriş yapılamadı, bilgilerinizi kontrol edin.',
+              duration: 3000
+            })
           } finally {
             this.loading = false
           }

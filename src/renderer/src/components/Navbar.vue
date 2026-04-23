@@ -18,10 +18,10 @@
       </div>
     </div>
     <div class="profile-section">
-      <p>Hoş geldin <span>{{ getProfileDetail.username }}!</span></p>
+      <p>Hoş geldin <span>{{ userFullName }}!</span></p>
       <el-dropdown class="profile-dropdown" @command="open">
         <span class="el-dropdown-link">
-          <el-avatar :src="getProfileDetail.imageUrl"></el-avatar>
+          <el-avatar :src="tenantLogoUrl" icon="el-icon-office-building"></el-avatar>
         </span>
         <el-dropdown-menu>
           <el-dropdown-item icon="el-icon-user">
@@ -38,44 +38,21 @@
 
 <script>
 import { SEARCH_ITEMS } from './../utils/constants';
-import { mapGetters } from 'vuex';
+import { supabase } from '../utils/supabase'
+import globalMixin from '../mixin/global.mixin.js';
 
 export default {
   name: 'Navbar',
+  mixins: [globalMixin],
   data() {
     return {
       form: {
         search: ''
       },
-      dialogVisible: false,
-      options: [
-        {
-          value: 'Option1',
-          label: 'Option1'
-        },
-        {
-          value: 'Option2',
-          label: 'Option2'
-        },
-        {
-          value: 'Option3',
-          label: 'Option3'
-        },
-        {
-          value: 'Option4',
-          label: 'Option4'
-        },
-        {
-          value: 'Option5',
-          label: 'Option5'
-        }
-      ]
+      dialogVisible: false
     }
   },
   computed: {
-    ...mapGetters({
-      getProfileDetail: 'user/getProfileDetail'
-    }),
     getSearchResult() {
       return SEARCH_ITEMS.filter((item) => {
         return item.keywords.toLowerCase().includes(this.form.search.toLowerCase())
@@ -104,9 +81,15 @@ export default {
         });
       });
     },
-    logout() {
-      localStorage.removeItem('token')
-      window.api.send('logout')
+    async logout() {
+      await supabase.auth.signOut()
+      localStorage.removeItem('tenant_id')
+      localStorage.removeItem('user_full_name')
+      localStorage.removeItem('user_role')
+      localStorage.removeItem('user_id')
+      
+      this.$router.push({ name: 'Login' })
+      // window.api.send('logout') // Eğer electron tarafında bir logout işlemi gerekiyorsa aktif kalabilir
     }
   },
   watch: {

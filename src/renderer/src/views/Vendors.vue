@@ -15,16 +15,21 @@
       <el-table-column prop="full_name" sortable label="Ad Soyad"></el-table-column>
       <el-table-column prop="phone" sortable label="Telefon Numarası"></el-table-column>
       <el-table-column prop="address" sortable label="Adres"></el-table-column>
-      <el-table-column fixed="right" label="İşlem" width="281">
+      <el-table-column prop="total_purchase" sortable label="Toplam Alım">
+        <template v-slot="scope">{{ scope.row.total_purchase | formatNumber }} ₺</template>
+      </el-table-column>
+      <el-table-column prop="total_paid" sortable label="Toplam Ödenen">
+        <template v-slot="scope">{{ scope.row.total_paid | formatNumber }} ₺</template>
+      </el-table-column>
+      <el-table-column prop="debt" sortable label="Borç">
         <template v-slot="scope">
-          <el-button
-            type="success"
-            size="small"
-            icon="el-icon-notebook-2"
-            @click="handleClick(scope.row)"
-            >Üretilen Partileri Gör</el-button
-          >
-
+          <el-tag :type="scope.row.debt > 0 ? 'danger' : 'success'" effect="dark">
+            {{ scope.row.debt | formatNumber }} ₺
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column fixed="right" label="İşlem" width="115">
+        <template v-slot="scope">
           <el-tooltip content="Tedarikçiyi Düzenle" placement="top-start">
             <el-button
               type="primary"
@@ -105,13 +110,15 @@
 
 <script>
 import { supabase } from '../utils/supabase'
+import globalMixin from '../mixin/global.mixin.js'
 
 export default {
   name: 'Vendors',
+  mixins: [globalMixin],
   data() {
     return {
       vendorList: [],
-      tenant_id: 'f07a3c67-d6cb-4ed3-a0da-a5009a75ec2e',
+      vendors: [],
       dialogVisible: false,
       currentPage: 1,
       pageSize: 8,
@@ -161,14 +168,32 @@ export default {
     async getAllVendor() {
       const { data, error } = await supabase
         .from('vendors')
-        .select('*')
-        .eq('tenant_id', this.tenant_id)
+        .select(
+          `
+          *,
+          production_inputs (
+            total_purchase_amount,
+            paid_amount
+          )
+        `
+        )
+        .eq('tenant_id', this.currentTenantId)
 
       if (error) {
         console.error('Error fetching vendors:', error)
         this.$message.error('Tedarikçiler yüklenirken bir hata oluştu.')
       } else {
-        this.vendorList = data
+        this.vendorList = data.map((v) => {
+          const total_purchase =
+            v.production_inputs?.reduce((s, i) => s + (i.total_purchase_amount || 0), 0) || 0
+          const total_paid = v.production_inputs?.reduce((s, i) => s + (i.paid_amount || 0), 0) || 0
+          return {
+            ...v,
+            total_purchase,
+            total_paid,
+            debt: total_purchase - total_paid
+          }
+        })
       }
     },
     async addVendor(payload) {
@@ -177,7 +202,7 @@ export default {
           full_name: payload.full_name,
           phone: payload.phone,
           address: payload.address,
-          tenant_id: this.tenant_id
+          tenant_id: this.currentTenantId
         }
       ])
       if (error) throw error
@@ -202,12 +227,6 @@ export default {
     },
     handlePageChange(page) {
       this.currentPage = page
-    },
-    handleClick(row) {
-      this.$router.push({
-        name: 'Manufacture',
-        params: { vendorName: row.full_name }
-      })
     },
     isOpenDialog(type, vendor = null) {
       this.editingVendor = type === 'edit'

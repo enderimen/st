@@ -2,12 +2,14 @@
   <div class="sidebar-content">
     <div class="sidebar-logo">
       <el-image
+        v-if="tenantLogoUrl"
         style="width: 80px; height: 80px"
-        :src="getProfileDetail.imageUrl"
+        :src="tenantLogoUrl"
         fit="cover"></el-image>
+      <i v-else class="el-icon-office-building" style="font-size: 40px; color: #fff; margin-bottom: 10px;"></i>
 
       <div>
-        <p>{{ getProfileDetail.companyName }}</p>
+        <p>{{ tenantName }}</p>
         <sub>v1.0.0</sub>
       </div>
     </div>
@@ -80,15 +82,6 @@
           Nasıl Kullanılır?
         </el-menu-item>
       </el-submenu>
-  
-      <!-- <el-submenu index="4">
-        <template #title>
-          <i class="el-icon-user"></i>
-          <span>Users</span>
-        </template>
-        <el-menu-item index="/users/list">Liste</el-menu-item>
-        <el-menu-item index="/users/new">Yeni</el-menu-item>
-      </el-submenu> -->
     </el-menu>
 
     <footer class="sidebar-footer" @click="open">
@@ -99,25 +92,29 @@
 </template>
 
 <script>
-import { mapGetters } from 'vuex'
+import { supabase } from '../utils/supabase'
+import globalMixin from '../mixin/global.mixin.js'
 
 export default {
   name: 'Sidebar',
+  mixins: [globalMixin],
   props: ['collapsed'],
   data() {
     return {
       dialogVisible: false
     }
   },
-  computed: {
-    ...mapGetters({
-      getProfileDetail: 'user/getProfileDetail'
-    })
-  },
   methods: {
-    logout() {
-      localStorage.removeItem('token')
-      window.api.send('logout');
+    async logout() {
+      await supabase.auth.signOut()
+      localStorage.removeItem('tenant_id')
+      localStorage.removeItem('tenant_name')
+      localStorage.removeItem('tenant_logo_url')
+      localStorage.removeItem('user_full_name')
+      localStorage.removeItem('user_role')
+      localStorage.removeItem('user_id')
+      
+      this.$router.push({ name: 'Login' })
     },
     open() {
       this.$confirm('Çıkış yapmak istediğinden emin misiniz?', 'Oturum Kapatma İşlemi', {
