@@ -1,11 +1,17 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, nativeImage } from 'electron';
 import { join } from 'path';
 import { electronApp, optimizer, is } from '@electron-toolkit/utils';
-import icon from '../../resources/icon.png?asset';
+/* import icon from '../../resources/icon.png?asset'; */
+
+const iconPath = is.dev
+  ? join(process.cwd(), 'resources/icon.png')
+  : join(process.resourcesPath, 'app.asar.unpacked/resources/icon.png');
 
 let mainWindow
 
 function createWindow() {
+  const image = nativeImage.createFromPath(iconPath);
+
   mainWindow = new BrowserWindow({
     width: 390,
     height: 480,
@@ -13,7 +19,7 @@ function createWindow() {
     resizable: false,
     autoHideMenuBar: true,
     center: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    icon: image,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -21,8 +27,11 @@ function createWindow() {
     }
   })
 
+  if (process.platform === 'darwin') {
+    app.dock.setIcon(image);
+  }
+
   mainWindow.on('ready-to-show', () => {
-    mainWindow.maximize()
     mainWindow.show()
   })
 
@@ -68,8 +77,8 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-});
+  app.quit()
+})
 
 app.on('before-quit', (e) => {
   // Burada logout gibi cleanup yapabilirsin

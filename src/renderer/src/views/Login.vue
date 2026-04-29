@@ -2,8 +2,14 @@
   <div class="login-page">
     <el-card class="login-card">
       <div class="login-header">
+        <el-image
+          v-if="tenantLogoUrl"
+          style="width: 80px; height: 80px"
+          :src="tenantLogoUrl"
+          fit="cover"
+        ></el-image>
         <h2 class="title">Hoş Geldiniz!</h2>
-        <p class="desc">Stok Takip Programı</p>
+        <p class="desc">{{ tenantName ? `${tenantName} - ` : '' }} Stok Takip Programı</p>
       </div>
 
       <el-alert
@@ -64,9 +70,11 @@
 </template>
 <script>
 import { supabase } from '../utils/supabase'
+import globalMixin from '../mixin/global.mixin.js'
 
 export default {
   name: 'Login',
+  mixins: [globalMixin],
   data() {
     return {
       loading: false,

@@ -12,24 +12,24 @@
 </template>
   
 <script>
-import ContentArea from '../components/ContentArea.vue';
-import Sidebar from '../components/Sidebar.vue';
-import Navbar from '../components/Navbar.vue';
+import ContentArea from '../components/ContentArea.vue'
+import Sidebar from '../components/Sidebar.vue'
+import Navbar from '../components/Navbar.vue'
 
 export default {
   name: 'PanelLayout',
   components: { Sidebar, Navbar, ContentArea },
   data() {
     return {
-      isSidebarCollapsed: false,
-    };
+      isSidebarCollapsed: false
+    }
   },
   methods: {
     toggleSidebar() {
-      this.isSidebarCollapsed = !this.isSidebarCollapsed;
-    },
-  },
-};
+      this.isSidebarCollapsed = !this.isSidebarCollapsed
+    }
+  }
+}
 </script>
 
 <style lang="scss">
