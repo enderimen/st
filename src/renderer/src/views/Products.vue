@@ -31,7 +31,16 @@
       </el-row>
     </el-form>
 
-    <el-table border style="width: 100%" :data="paginatedData" empty-text="Ürün çeşidi bulunamadı">
+    <div v-if="loading" style="padding: 20px">
+      <el-skeleton :rows="8" animated />
+    </div>
+    <el-table
+      v-else
+      border
+      style="width: 100%"
+      :data="paginatedData"
+      empty-text="Ürün çeşidi bulunamadı"
+    >
       <el-table-column prop="category" sortable label="Kategori"></el-table-column>
       <el-table-column prop="name" sortable label="Ürün Adı"></el-table-column>
       <el-table-column prop="unitWeight" sortable label="Ürün Tipi"></el-table-column>
@@ -129,6 +138,7 @@ export default {
   mixins: [globalMixin],
   data() {
     return {
+      loading: false,
       productList: [],
       products: [],
       dialogVisible: false,
@@ -199,6 +209,7 @@ export default {
   },
   methods: {
     async getAllProductTypes() {
+      this.loading = true
       const { data, error } = await supabase
         .from('product_types')
         .select('*')
@@ -216,10 +227,10 @@ export default {
             category: item.category,
             unitWeight: `${uWeight}KG`,
             isGrass: item.is_grassy !== undefined ? item.is_grassy : item.isGrass,
-            tenant_id: item.tenant_id
           }
         })
       }
+      this.loading = false
     },
     async addProduct(payload) {
       const { error } = await supabase.from('product_types').insert([

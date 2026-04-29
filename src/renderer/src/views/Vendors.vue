@@ -11,7 +11,18 @@
       <el-input v-model="filter.search" placeholder="Tedarikçi arayın" clearable />
     </div>
 
-    <el-table :data="paginatedData" border style="width: 100%" empty-text="Tedarikçi bulunamadı">
+    <div v-if="loading" style="padding: 20px">
+      <el-skeleton :rows="8" animated />
+    </div>
+    <el-table
+      v-else
+      :data="paginatedData"
+      border
+      show-summary
+      :summary-method="getSummary"
+      style="width: 100%"
+      empty-text="Tedarikçi bulunamadı"
+    >
       <el-table-column prop="full_name" sortable label="Ad Soyad"></el-table-column>
       <el-table-column prop="phone" sortable label="Telefon Numarası"></el-table-column>
       <el-table-column prop="address" sortable label="Adres"></el-table-column>
@@ -24,7 +35,7 @@
       <el-table-column prop="debt" sortable label="Borç">
         <template v-slot="scope">
           <el-tag :type="scope.row.debt > 0 ? 'danger' : 'success'" effect="dark">
-            {{ scope.row.debt | formatNumber }} ₺
+            {{ scope.row.debt > 0 ? formatNumber(scope.row.debt) + ' ₺' : 'Borç Bulunmuyor' }}
           </el-tag>
         </template>
       </el-table-column>
@@ -98,6 +109,31 @@
             v-model="formData.address"
           ></el-input>
         </el-form-item>
+
+        <el-divider v-if="editingVendor && formData.debt > 0">Borç Ödeme</el-divider>
+        <el-row v-if="editingVendor && formData.debt > 0" :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="Mevcut Borç">
+              <el-input :value="formatNumber(formData.debt) + ' ₺'" disabled></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="Ödeme Tutarı">
+              <price-input
+                v-model="formData.newPayment"
+                :max="formData.debt"
+                @input="onPaymentInput"
+              />
+              <el-checkbox
+                v-model="formData.isPayAll"
+                @change="handlePayAll"
+                style="margin-top: 5px; float: right"
+              >
+                Tümünü Öde
+              </el-checkbox>
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
 
       <span slot="footer" class="dialog-footer">
@@ -111,21 +147,35 @@
 <script>
 import { supabase } from '../utils/supabase'
 import globalMixin from '../mixin/global.mixin.js'
+import { formatNumber } from '../utils/helpers'
+import PriceInput from '../components/PriceInput.vue'
 
 export default {
   name: 'Vendors',
   mixins: [globalMixin],
+  components: {
+    PriceInput
+  },
   data() {
     return {
+      loading: false,
       vendorList: [],
       vendors: [],
       dialogVisible: false,
       currentPage: 1,
-      pageSize: 8,
+      pageSize: 10,
       filter: { search: '' },
       editingVendor: false,
       originalFormData: null,
-      formData: { id: '', full_name: '', phone: '', address: '' },
+      formData: {
+        id: '',
+        full_name: '',
+        phone: '',
+        address: '',
+        debt: 0,
+        newPayment: 0,
+        isPayAll: false
+      },
       rules: {
         full_name: [{ required: true, message: 'Ad Soyad zorunlu', trigger: 'blur' }],
         phone: [
@@ -166,6 +216,7 @@ export default {
   },
   methods: {
     async getAllVendor() {
+      this.loading = true
       const { data, error } = await supabase
         .from('vendors')
         .select(
@@ -195,6 +246,51 @@ export default {
           }
         })
       }
+      this.loading = false
+    },
+    getSummary(param) {
+      const { columns, data } = param
+      const sums = []
+      columns.forEach((column, index) => {
+        if (index === 0) {
+          sums[index] = 'Toplam'
+          return
+        }
+        if (['total_purchase', 'total_paid', 'debt'].includes(column.property)) {
+          const values = data.map((item) => Number(item[column.property]))
+          if (!values.every((value) => isNaN(value))) {
+            const total = values.reduce((prev, curr) => {
+              const value = Number(curr)
+              if (!isNaN(value)) {
+                return prev + curr
+              } else {
+                return prev
+              }
+            }, 0)
+            sums[index] = formatNumber(total) + ' ₺'
+          }
+        } else {
+          sums[index] = ''
+        }
+      })
+      return sums
+    },
+    formatNumber(val) {
+      return formatNumber(val)
+    },
+    handlePayAll(val) {
+      if (val) {
+        this.formData.newPayment = this.formData.debt
+      } else {
+        this.formData.newPayment = 0
+      }
+    },
+    onPaymentInput(val) {
+      if (val < this.formData.debt) {
+        this.formData.isPayAll = false
+      } else if (val === this.formData.debt) {
+        this.formData.isPayAll = true
+      }
     },
     async addVendor(payload) {
       const { error } = await supabase.from('vendors').insert([
@@ -220,6 +316,52 @@ export default {
       if (error) throw error
       await this.getAllVendor()
     },
+    async processVendorPayment(vendorId, paymentAmount) {
+      this.loading = true
+      try {
+        // 1. Bu tedarikçiye ait borçlu alımları (inputs) çekelim
+        const { data: inputs, error } = await supabase
+          .from('production_inputs')
+          .select('id, total_purchase_amount, paid_amount, received_at')
+          .eq('vendor_id', vendorId)
+          .order('received_at', { ascending: true })
+
+        if (error) throw error
+
+        let remainingPayment = paymentAmount
+        const updatePromises = []
+
+        // 2. Borcu olan kayıtları filtrele
+        const debtInputs =
+          inputs?.filter((i) => (i.total_purchase_amount || 0) > (i.paid_amount || 0)) || []
+
+        // 3. Ödemeyi FIFO (İlk giren ilk çıkar) mantığıyla dağıt
+        for (const input of debtInputs) {
+          if (remainingPayment <= 0) break
+
+          const currentDebt = (input.total_purchase_amount || 0) - (input.paid_amount || 0)
+          const paymentForThis = Math.min(remainingPayment, currentDebt)
+
+          updatePromises.push(
+            supabase
+              .from('production_inputs')
+              .update({ paid_amount: (input.paid_amount || 0) + paymentForThis })
+              .eq('id', input.id)
+          )
+
+          remainingPayment -= paymentForThis
+        }
+
+        if (updatePromises.length > 0) {
+          await Promise.all(updatePromises)
+        }
+      } catch (err) {
+        console.error('Payment error:', err)
+        throw err
+      } finally {
+        this.loading = false
+      }
+    },
     async deleteVendor(id) {
       const { error } = await supabase.from('vendors').delete().eq('id', id)
       if (error) throw error
@@ -231,10 +373,21 @@ export default {
     isOpenDialog(type, vendor = null) {
       this.editingVendor = type === 'edit'
       if (vendor) {
-        this.formData = { ...vendor }
-        this.originalFormData = { ...vendor }
+        this.formData = {
+          ...vendor,
+          newPayment: 0,
+          isPayAll: false
+        }
+        this.originalFormData = JSON.parse(JSON.stringify(this.formData))
       } else {
-        this.formData = { full_name: '', phone: '', address: '' }
+        this.formData = {
+          full_name: '',
+          phone: '',
+          address: '',
+          debt: 0,
+          newPayment: 0,
+          isPayAll: false
+        }
         this.originalFormData = null
       }
       this.dialogVisible = true
@@ -245,11 +398,14 @@ export default {
 
         if (this.editingVendor) {
           try {
+            if (this.formData.newPayment > 0) {
+              await this.processVendorPayment(this.formData.id, this.formData.newPayment)
+            }
             await this.updateVendor(this.formData)
             this.$notify({
               title: 'Başarılı',
               type: 'success',
-              message: 'Tedarikçi bilgileri güncellendi!'
+              message: 'Tedarikçi bilgileri ve ödeme güncellendi!'
             })
           } catch (error) {
             this.$message.error('Tedarikçi güncellenirken hata oluştu.')

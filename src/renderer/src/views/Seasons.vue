@@ -21,7 +21,10 @@
       <el-input v-model="filter.search" placeholder="Sezon arayın" clearable />
     </div>
 
-    <el-table :data="paginatedData" border style="width: 100%" empty-text="Sezon bulunamadı">
+    <div v-if="loading" style="padding: 20px">
+      <el-skeleton :rows="8" animated />
+    </div>
+    <el-table v-else :data="paginatedData" border style="width: 100%" empty-text="Sezon bulunamadı">
       <!-- <el-table-column prop="id" label="ID" width="180"> </el-table-column> -->
       <el-table-column prop="name" label="Sezon İsmi"></el-table-column>
       <el-table-column prop="createdDate" label="Oluşturulma Zamanı">
@@ -114,6 +117,7 @@ export default {
   mixins: [globalMixin],
   data() {
     return {
+      loading: false,
       seasonList: [],
       seasons: [],
       currentYear: '',
@@ -177,6 +181,7 @@ export default {
   },
   methods: {
     async getAllSeasons() {
+      this.loading = true
       const { data, error } = await supabase
         .from('seasons')
         .select('*')
@@ -190,10 +195,10 @@ export default {
           id: item.id,
           name: item.name,
           createdDate: item.created_at,
-          totalOutputWeight: 0,
           tenant_id: item.tenant_id
         }))
       }
+      this.loading = false
     },
     async addSeason(payload) {
       const { error } = await supabase.from('seasons').insert([

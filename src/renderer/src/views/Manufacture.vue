@@ -32,7 +32,11 @@
     </el-form>
 
     <!-- Ana Tablo (Partiler) -->
+    <div v-if="loading" style="padding: 20px">
+      <el-skeleton :rows="8" animated />
+    </div>
     <el-table
+      v-else
       ref="batchTable"
       :data="paginatedData"
       border
@@ -54,11 +58,7 @@
               empty-text="Henüz alım yok"
               style="width: 100%"
             >
-              <el-table-column
-                prop="vendorName"
-                label="Tedarikçi"
-                min-width="140"
-              ></el-table-column>
+              <el-table-column prop="vendorName" label="Tedarikçi" width="170"></el-table-column>
               <el-table-column prop="receivedAt" label="Alım Tarihi" width="130">
                 <template v-slot="s">{{ s.row.receivedAt | formatDate }}</template>
               </el-table-column>
@@ -75,12 +75,8 @@
                 <template v-slot="s">{{ s.row.paidAmount | formatNumber }} ₺</template>
               </el-table-column>
               <el-table-column prop="paymentType" label="Ödeme Türü" width="120"></el-table-column>
-              <el-table-column prop="notes" label="Not" width="60">
-                <template v-slot="s">
-                  <el-tooltip effect="dark" :content="s.row.notes || 'Not yok'" placement="left">
-                    <i class="el-icon-info"></i>
-                  </el-tooltip>
-                </template>
+              <el-table-column prop="notes" label="Not">
+                <template v-slot="s">{{ s.row.notes }}</template>
               </el-table-column>
               <el-table-column label="İşlem" width="90" fixed="right">
                 <template v-slot="s">
@@ -128,9 +124,9 @@
       </el-table-column>
       <el-table-column prop="totalWasteKG" sortable label="Top. Fire(kg)">
         <template v-slot="scope">
-          <span v-if="scope.row.isCompleted && scope.row.totalWasteKG !== null"
-            >{{ scope.row.totalWasteKG | formatNumber }} kg</span
-          >
+          <span v-if="scope.row.isCompleted && scope.row.totalWasteKG !== null">{{
+            scope.row.totalWasteKG | formatNumber
+          }}</span>
           <el-tag v-else type="info" effect="dark" size="small">-</el-tag>
         </template>
       </el-table-column>
@@ -280,6 +276,7 @@
                 v-model="inputForm.inputWeight"
                 @change="calcTotal"
                 style="width: 100%"
+                :precision="2"
               ></el-input-number>
             </el-form-item>
           </el-col>
@@ -486,7 +483,7 @@ export default {
       outputDialogVisible: false,
       outputDateEditable: false,
       selectedBatch: null,
-      // Batch form
+      defaultSeasonId: '',
       batchForm: { batchName: '', seasonId: '', notes: '' },
       batchRules: {
         batchName: [{ required: true, message: 'Parti adı giriniz', trigger: 'blur' }],
@@ -527,11 +524,19 @@ export default {
   },
   filters: { formatDate, formatNumber },
   async mounted() {
-    await this.fetchAuxiliaryData()
-    await this.fetchAllProductions()
-    // Default son sezonu seç
-    if (this.seasonList.length > 0) {
-      this.filter.season = this.seasonList[this.seasonList.length - 1].value
+    this.loading = true
+    try {
+      await this.fetchAuxiliaryData()
+      await this.fetchAllProductions()
+      
+      // Önce mevcut yıla ait sezonu seç, yoksa listenin sonundakini seç
+      if (this.defaultSeasonId) {
+        this.filter.season = this.defaultSeasonId
+      } else if (this.seasonList.length > 0) {
+        this.filter.season = this.seasonList[this.seasonList.length - 1].value
+      }
+    } finally {
+      this.loading = false
     }
   },
   computed: {
@@ -602,6 +607,13 @@ export default {
         .select('id, name')
         .eq('tenant_id', this.currentTenantId)
       this.seasonList = seasons?.map((s) => ({ label: s.name, value: s.id })) || []
+      
+      // Varsayılan sezonu bul (mevcut yılın sezonu)
+      const currentYear = new Date().getFullYear().toString()
+      const defaultSeason = this.seasonList.find(s => s.label.includes(currentYear))
+      if (defaultSeason) {
+        this.defaultSeasonId = defaultSeason.value
+      }
       const { data: products } = await supabase
         .from('product_types')
         .select('*')
@@ -609,6 +621,7 @@ export default {
       this.productTypes = products || []
     },
     async fetchAllProductions() {
+      this.loading = true
       const { data, error } = await supabase
         .from('production_batches')
         .select(
@@ -636,6 +649,7 @@ export default {
         .eq('tenant_id', this.currentTenantId)
         .order('created_at', { ascending: false })
 
+      this.loading = false
       if (error) {
         console.error('Error fetching productions:', error)
         this.$message.error('Üretimler yüklenirken hata oluştu.')
@@ -660,7 +674,12 @@ export default {
           notes: batch.notes,
           totalInputKG,
           totalCost,
-          unitCostPerKg: totalInputKG > 0 ? totalCost / totalInputKG : 0,
+          unitCostPerKg:
+            totalOutputKG > 0
+              ? totalCost / totalOutputKG
+              : totalInputKG > 0
+              ? totalCost / totalInputKG
+              : 0,
           totalOutputKG,
           totalWasteKG: batch.is_completed ? totalInputKG - totalOutputKG : null,
           inputs:
@@ -697,7 +716,14 @@ export default {
       this.batchDialogVisible = true
     },
     resetBatchForm() {
-      this.batchForm = { batchName: '', seasonId: '', notes: '' }
+      this.batchForm = { 
+        batchName: '', 
+        seasonId: this.defaultSeasonId || '', 
+        notes: '' 
+      }
+      if (this.batchForm.seasonId) {
+        this.updateAutoName(this.batchForm.seasonId)
+      }
     },
     updateAutoName(seasonId) {
       if (!seasonId) return

@@ -97,7 +97,11 @@
       </el-row>
     </el-form>
 
+    <div v-if="loading" style="padding: 20px">
+      <el-skeleton :rows="10" animated />
+    </div>
     <el-table
+      v-else
       :data="paginatedData"
       border
       show-summary
@@ -177,251 +181,7 @@
       style="margin-top: 20px; text-align: center"
     />
 
-    <el-dialog
-      :title="getPopupTitle"
-      :visible.sync="dialogVisible"
-      width="37%"
-      @close="closePopup"
-    >
-      <el-form label-position="top" :model="formData" label-width="100px">
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="Ad Soyad">
-              <el-input v-model="formData.fullName" disabled></el-input>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="Telefon">
-              <el-input v-model="formData.phone" disabled></el-input>
-            </el-form-item>
-          </el-col>
-        </el-row>
-
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="Sezon" class="custom-width">
-              <el-select v-model="formData.season" filterable clearable placeholder="Sezon seçin">
-                <el-option
-                v-for="item in getSeasonList"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-                ></el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-row :gutter="16">
-              <el-col :span="12">
-                <el-form-item label="Ayrılan KG" class="totalkg">
-                  <el-input-number v-model="formData.totalKg" size="medium" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="Kalan KG">
-                  <el-input :value="calcRemainingKG" disabled></el-input>
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-col>
-        </el-row>
-
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="Toplam Alım Tutarı" prop="purchasedAmount">
-              <price-input v-model="formData.purchasedAmount" :decimals="2" :min="0" :disabled="isShowDetail" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="Ödeme Tipi" class="custom-width">
-              <el-radio-group v-model="formData.paymentType" size="small">
-                <el-radio label="0">Nakit</el-radio>
-                <el-radio label="1">Havale / EFT</el-radio>
-              </el-radio-group>
-            </el-form-item>
-          </el-col>
-        </el-row>
-
-        <el-form-item v-if="editingAccounting">
-          <el-switch
-            style="display: block"
-            v-model="formData.isClosing"
-            active-color="#13ce66"
-            inactive-color="#ff4949"
-            :active-text="`Cari ${formData.isClosing ? 'Aktif' : 'Pasif'}`">
-          </el-switch>
-        </el-form-item>
-
-        <div class="alert-group" v-if="editingAccounting">
-          <el-alert
-            v-if="!formData.isClosing && calcRemainingKG == 0"
-            title="Not: Carisi kapatılan müşterinin kg hakkı rezerve durumundan çıkarılacaktır."
-            type="error">
-          </el-alert>
-          <el-alert
-            v-if="calcRemainingKG < 0"
-            title="Not: Müşteri için ayrılan kg değerini aştınız."
-            type="error">
-          </el-alert>
-          <el-alert
-            v-if="calcRemainingKG == 0 && originalData.remainingKg != 0"
-            title="Not: Müşteri için ayrılmış olan tüm kg teslim edilmiş olacaktır."
-            type="success">
-          </el-alert>
-          <el-alert
-            v-if="!formData.isClosing && calcRemainingKG > 0"
-            title="Not: Müşterinin kg hakkı tamamen teslim edilmeden cari kapaması yapılamaz."
-            type="error">
-          </el-alert>
-        </div>
-        
-        <!-- <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item>
-              <el-switch
-                style="display: block"
-                v-model="formData.isClosing"
-                active-color="#13ce66"
-                inactive-color="#ff4949"
-                active-text="Cari Pasif"
-                inactive-text="Cari Aktif">
-              </el-switch>
-            </el-form-item>
-          </el-col>
-        </el-row> -->
-
-        <el-alert
-          v-if="formData.purchasedAmount && formData.purchasedAmount > 0 && formData.paymentType"
-          :title="getPaymentNote"
-          type="info"
-          :closable="false"
-          show-icon>
-        </el-alert>
-
-        <br>
-        
-        <!-- <div v-if="!editingAccounting" class="tab-wrapper">
-          <el-tabs type="card" class="tab-custom">
-            <el-tab-pane :label="`Sade Tulum (${calcTotalHerbyTulumKG}kg)`">
-              <el-row :gutter="16">
-                <el-col :span="6">
-                  <el-form-item label="1KG">
-                    <el-input-number v-model="formData.productTypePayload.herbTulum.kg1" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="6">
-                  <el-form-item label="2KG">
-                    <el-input-number v-model="formData.productTypePayload.herbTulum.kg2" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="6">
-                  <el-form-item label="3KG">
-                    <el-input-number v-model="formData.productTypePayload.herbTulum.kg3" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="6">
-                  <el-form-item label="5KG">
-                    <el-input-number v-model="formData.productTypePayload.herbTulum.kg5" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-              </el-row>
-            </el-tab-pane>
-            <el-tab-pane :label="`Otlu Tulum (${calcTotalPlainTulumKG}kg)`">
-              <el-row :gutter="16">
-                <el-col :span="6">
-                  <el-form-item label="1KG">
-                    <el-input-number v-model="formData.productTypePayload.plainTulum.kg1" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="6">
-                  <el-form-item label="2KG">
-                    <el-input-number v-model="formData.productTypePayload.plainTulum.kg2" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="6">
-                  <el-form-item label="3KG">
-                    <el-input-number v-model="formData.productTypePayload.plainTulum.kg3" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="6">
-                  <el-form-item label="5KG">
-                    <el-input-number v-model="formData.productTypePayload.plainTulum.kg5" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-              </el-row>
-            </el-tab-pane>
-            <el-tab-pane :label="`Salamura (${calcTotalPlainBrineKG}kg)`">
-              <el-row :gutter="16">
-                <el-col :span="6">
-                  <el-form-item label="2KG">
-                    <el-input-number v-model="formData.productTypePayload.plainBrine.kg2" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="6">
-                  <el-form-item label="3KG">
-                    <el-input-number v-model="formData.productTypePayload.plainBrine.kg3" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="6">
-                  <el-form-item label="5KG">
-                    <el-input-number v-model="formData.productTypePayload.plainBrine.kg5" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-              </el-row>
-            </el-tab-pane>
-            <el-tab-pane :label="`Salamura (${calcTotalHerbBrineKG}kg)`">
-              <el-row :gutter="16">
-                <el-col :span="6">
-                  <el-form-item label="2KG">
-                    <el-input-number v-model="formData.productTypePayload.herbBrine.kg2" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="6">
-                  <el-form-item label="3KG">
-                    <el-input-number v-model="formData.productTypePayload.herbBrine.kg3" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="6">
-                  <el-form-item label="5KG">
-                    <el-input-number v-model="formData.productTypePayload.herbBrine.kg5" size="small" :min="0" :step="1" :disabled="isShowDetail"></el-input-number>
-                  </el-form-item>
-                </el-col>
-              </el-row>
-            </el-tab-pane>
-          </el-tabs>
-          <p class="total-balance">Toplam: {{ sumTotalKG }} KG</p>
-        </div> -->
-
-        <!-- <div class="alert-group" v-if="editingAccounting">
-          <el-alert
-            v-if="!formData.isClosing && calcRemainingKG == 0"
-            title="Not: Carisi kapatılan müşterinin kg hakkı rezerve durumundan çıkarılacaktır."
-            type="error">
-          </el-alert>
-          <el-alert
-            v-if="calcRemainingKG < 0"
-            title="Not: Müşteri için ayrılan kg değerini aştınız."
-            type="error">
-          </el-alert>
-          <el-alert
-            v-if="calcRemainingKG == 0"
-            title="Not: Müşteri için ayrılmış olan tüm kg teslim edilmiş olacaktır."
-            type="success">
-          </el-alert>
-          <el-alert
-            v-if="!formData.isClosing && calcRemainingKG > 0"
-            title="Not: Müşterinin kg hakkı tamamen teslim edilmeden cari kapaması yapılamaz."
-            type="error">
-          </el-alert>
-        </div> -->
-      </el-form>
-
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="dialogVisible = false">Vazgeç</el-button>
-        <el-button v-if="!isShowDetail" type="primary" @click="saveAccounting" :disabled="checkValidation">Kaydet</el-button>
-        <el-button v-else type="primary" @click="closePopup">Kapat</el-button>
-      </span>
-    </el-dialog>
+    <!-- Cari Düzenleme Artık Customers.vue üzerinden yapılıyor -->
   </el-card>
 </template>
 
@@ -438,62 +198,26 @@ export default {
   mixins: [globalMixin],
   data() {
     return {
+      loading: false,
       dialogVisible: false,
-      editingAccounting: false,
-      isShowDetail: false,
       currentPage: 1,
       pageSize: 8,
-      outputDetail: null,
       filter: {
         search: '',
         season: '',
         receivedDate: '',
         isClosing: 'Tümü'
       },
-      customerBalanceList: [],
-      search: '',
-      customerDetail: null,
-      originalData: {
-        totalKg: 0,
-        remainingKg: 0,
-      },
-      formData: {
-        fullName: "", 
-        phone: "", 
-        address: "",
-        season: "",
-        totalKg: 0,
-        remainingKg: 0,
-        isClosing: false,
-        purchasedAmount: 0,
-        paymentType: "Nakit",
-        productTypePayload: {
-          herbTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 }, 
-          plainTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 }, 
-          plainBrine: {  kg2: 0, kg3: 0, kg5: 0 }, 
-          herbBrine: {  kg2: 0, kg3: 0, kg5: 0 } 
-        },
-      },
+      customerBalanceList: []
     }
   },
   async mounted() {
     await this.getAllCustomerBalance()
 
-    // Eğer bir yönlendirme ile gelindiyse (Cari Oluştur gibi)
-    if (this.$route.params?.type === 'add' || this.$route.params?.customerId) {
-      await this.isOpenDialog('add')
-    }
-
     this.filter.season = this.$route.params?.season || ''
     this.filter.search = this.$route.params?.customerName || ''
   },
   computed: {
-    getPaymentNote() {
-      return `${this.formData.fullName}, ${this.formData.totalKg} KG ürün karşılığında ${ this.formData.paymentType == "1" ? 'Havale / EFT' : 'Nakit' } yoluyla ${this.getFormatedPurchasedAmount}₺ ödeme yapmıştır.`;
-    },
-    checkValidation() {
-      return this.editingAccounting ? (this.originalData.remainingKg != 0 && !this.formData.isClosing) || this.calcRemainingKG < 0 : this.calcRemainingKG < 0;
-    },
     filteredData() {
       const filtered = this.customerBalanceList.filter((item) => {
         const matchesSearch = this.filter.search
@@ -514,70 +238,15 @@ export default {
 
       // Oluşturulma tarihine göre azalan sıralama (en yenisi en üstte)
       return filtered?.sort((a, b) => {
-        const dateA = new Date(a.createdAt);
-        const dateB = new Date(b.createdAt);
-        return dateB - dateA; // büyükten küçüğe
-      });
+        const dateA = new Date(a.createdAt)
+        const dateB = new Date(b.createdAt)
+        return dateB - dateA // büyükten küçüğe
+      })
     },
     paginatedData() {
-      const start = (this.currentPage - 1) * this.pageSize;
-      const end = start + this.pageSize;
-      return this.filteredData?.slice(start, end);
-    },
-    calcTotalHerbyTulumKG() {
-      const h = this.formData.productTypePayload.herbTulum;
-      return (
-        (h.kg1 * 1) + 
-        (h.kg2 * 2) + 
-        (h.kg3 * 3) + 
-        (h.kg5 * 5)
-      );
-    },
-    calcTotalPlainTulumKG() {
-      const p = this.formData.productTypePayload.plainTulum;
-      return ( 
-        (p.kg1 * 1) + 
-        (p.kg2 * 2) + 
-        (p.kg3 * 3) + 
-        (p.kg5 * 5)
-      );
-    },
-    calcTotalPlainBrineKG() {
-      const b = this.formData.productTypePayload.plainBrine;
-      return (
-        (b.kg2 * 2) +
-        (b.kg3 * 3) +
-        (b.kg5 * 5)
-      );
-    },
-    calcTotalHerbBrineKG() {
-      const b = this.formData.productTypePayload.herbBrine
-      return b.kg2 * 2 + b.kg3 * 3 + b.kg5 * 5
-    },
-    sumTotalKG() {
-      return (
-        this.calcTotalHerbyTulumKG +
-        this.calcTotalPlainTulumKG +
-        this.calcTotalPlainBrineKG +
-        this.calcTotalHerbBrineKG
-      );
-    },
-    calcRemainingKG() {
-      // Servisten gelen remaining ile formdaki yeni total'i birleştir
-      const alreadyUsed = this.originalData.totalKg - this.originalData.remainingKg; // geçmiş teslimatlar
-      return this.formData.totalKg - alreadyUsed - this.sumTotalKG;
-    },
-    getPopupTitle() {
-      let title;
-      if (this.isShowDetail) {
-        title = `Ender İmen - Cari Detayı`;
-        return title;
-      }
-
-      return this.editingAccounting ? 'Müşteri Carisini Düzenle' : 'Yeni Cari Oluştur';
-    },
-    getFormatedPurchasedAmount() {
-      return this.formData.purchasedAmount ? formatNumber(this.formData.purchasedAmount) : '';
+      const start = (this.currentPage - 1) * this.pageSize
+      const end = start + this.pageSize
+      return this.filteredData?.slice(start, end)
     }
   },
   methods: {
@@ -588,6 +257,7 @@ export default {
       this.$router.push({ name: 'AccountingProcess', params: { type: 'add', user: row } })
     },
     async getAllCustomerBalance() {
+      this.loading = true
       const { data, error } = await supabase
         .from('customer_balances')
         .select(`
@@ -619,138 +289,16 @@ export default {
         createdAt: item.created_at,
         hasTransaction: true // Detay ekranı için
       }))
+      this.loading = false
     },
-    async isOpenDialog(type, row = {}) {
-      this.editingAccounting = type === 'edit'
-      this.outputDetail = row
-      if (this.editingAccounting) {
-        this.fillForm()
-      } else {
-        const customerId = row.customerId || this.$route.params?.customerId
-        if (customerId) {
-          const { data } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('id', customerId)
-            .single()
-          this.customerDetail = data
+    isOpenDialog(type, row) {
+      // Yönlendirme yaparak Customers.vue daki dialogu açtırıyoruz
+      this.$router.push({
+        name: 'Customers',
+        params: {
+          customerId: row.customerId
         }
-        this.resetFormData()
-      }
-      this.dialogVisible = true
-    },
-    resetFormData() {
-      this.formData = {
-        fullName: this.customerDetail?.full_name || '',
-        phone: this.customerDetail?.phone || '',
-        address: this.customerDetail?.address || '',
-        season: '',
-        totalKg: 0,
-        remainingKg: 0,
-        isClosing: false,
-        purchasedAmount: 0,
-        paymentType: 'Nakit',
-        productTypePayload: {
-          herbTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 },
-          plainTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 },
-          plainBrine: { kg2: 0, kg3: 0, kg5: 0 },
-          herbBrine: { kg2: 0, kg3: 0, kg5: 0 }
-        }
-      }
-
-      this.originalData.totalKg = 0
-      this.originalData.remainingKg = 0
-
-      // Mevcut yılı sezon listesinden bulalım
-      const currentYear = new Date().getFullYear().toString()
-      const foundSeason = this.getSeasonList?.find((s) => s.label.includes(currentYear))
-      if (foundSeason) this.formData.season = foundSeason.value
-    },
-    fillForm() {
-      if (!this.outputDetail) return
-
-      this.formData.fullName = this.outputDetail.name
-      this.formData.phone = this.outputDetail.phone
-      this.formData.season = this.outputDetail.seasonId?.toString()
-      this.formData.isClosing = !this.outputDetail.isClosing
-
-      // Müşteri tüm hakkını kullanmışsa, yeni dönem için sıfırdan başlat
-      if (this.outputDetail.remainingKg == 0) {
-        this.formData.totalKg = 0
-        this.formData.purchasedAmount = 0
-        this.formData.paymentType = 'Nakit'
-        this.originalData.totalKg = 0
-        this.originalData.remainingKg = 0
-      } else {
-        this.formData.totalKg = this.outputDetail.totalKg || 0
-        this.formData.paymentType = this.outputDetail.paymentType?.toString() || 'Nakit'
-        this.formData.purchasedAmount = this.outputDetail.purchasedAmount || 0
-        this.originalData.totalKg = this.outputDetail.totalKg || 0
-        this.originalData.remainingKg = this.outputDetail.remainingKg || 0
-      }
-    },
-    async saveAccounting() {
-      if (!this.formData.season) {
-        this.$message.warning('Lütfen bir sezon seçin.')
-        return
-      }
-
-      const payload = {
-        customer_id: this.editingAccounting
-          ? this.outputDetail.customerId
-          : (this.$route.params?.customerId || this.customerDetail?.id),
-        season_id: this.formData.season,
-        total_kg_quota: this.formData.totalKg,
-        remaining_kg_quota: this.editingAccounting
-          ? this.formData.totalKg - (this.originalData.totalKg - this.originalData.remainingKg)
-          : this.formData.totalKg,
-        total_paid_amount: this.formData.purchasedAmount,
-        payment_type: this.formData.paymentType,
-        tenant_id: this.currentTenantId
-      }
-
-      try {
-        if (!this.editingAccounting) {
-          // Mükerrer kayıt kontrolü
-          const { data: existing } = await supabase
-            .from('customer_balances')
-            .select('id')
-            .eq('customer_id', payload.customer_id)
-            .eq('season_id', payload.season_id)
-            .maybeSingle()
-
-          if (existing) {
-            this.$message.error('Bu müşteri için bu sezonda zaten bir cari bakiye tanımlanmış!')
-            return
-          }
-        }
-
-        if (this.editingAccounting) {
-          const { error } = await supabase
-            .from('customer_balances')
-            .update(payload)
-            .eq('id', this.outputDetail.id)
-          if (error) throw error
-          this.$notify({
-            title: 'Başarılı',
-            type: 'success',
-            message: 'Müşteri carisi güncellendi!'
-          })
-        } else {
-          const { error } = await supabase.from('customer_balances').insert([payload])
-          if (error) throw error
-          this.$notify({
-            title: 'Başarılı',
-            type: 'success',
-            message: 'Müşteri carisi oluşturuldu!'
-          })
-        }
-        await this.getAllCustomerBalance()
-        this.closePopup()
-      } catch (err) {
-        console.error(err)
-        this.$message.error('İşlem sırasında hata oluştu.')
-      }
+      })
     },
     async open(row, type) {
       const status = type === 'close' ? 'kapatmak' : 'aktifleştirmek'
@@ -765,9 +313,9 @@ export default {
       )
         .then(async () => {
           const { error } = await supabase
-            .from('customers')
+            .from('customer_balances')
             .update({ is_closed: type === 'close' })
-            .eq('id', row.customerId)
+            .eq('id', row.id)
 
           if (error) throw error
 
@@ -787,18 +335,41 @@ export default {
         })
     },
     getSummaries(param) {
-      const { columns, data } = param;
-      const sums = [];
+      const { columns, data } = param
+      const sums = []
 
       columns.forEach((column, index) => {
         if (index === 0) {
-          sums[index] = 'Toplam';
-          return;
+          sums[index] = 'Toplam'
+          return
         }
 
         // sadece 'kg' içeren kolonlar için toplam hesapla
-        const isKgColumn =
-          column?.property &&
+        const isKgColumn = column.property === 'totalKg' || column.property === 'remainingKg'
+        if (isKgColumn) {
+          const values = data.map((item) => Number(item[column.property]))
+          if (!values.every((value) => isNaN(value))) {
+            sums[index] = values.reduce((prev, curr) => {
+              const value = Number(curr)
+              if (!isNaN(value)) {
+                return prev + curr
+              } else {
+                return prev
+              }
+            }, 0)
+          } else {
+            sums[index] = 'N/A'
+          }
+        } else {
+          sums[index] = ''
+        }
+      })
+
+      return sums
+    }
+  }
+}
+</script>          column?.property &&
           column.property.toLowerCase().includes('kg') &&
           column.property !== 'isClosing';
 

@@ -107,7 +107,11 @@
       </el-row>
     </el-form>
 
+    <div v-if="loading" style="padding: 20px">
+      <el-skeleton :rows="12" animated />
+    </div>
     <el-table
+      v-else
       :data="paginatedData"
       border
       show-summary
@@ -162,13 +166,15 @@
           {{ scope.row.createdAt | formatDate }}
         </template>
       </el-table-column>
-      <el-table-column prop="receivedKg" sortable label="Alınan(kg)"></el-table-column>
-      <el-table-column prop="remainingKg" sortable label="Kalan(kg)" width="200px">
+      <el-table-column prop="receivedKg" sortable label="Teslim Edilen(kg)"></el-table-column>
+      <el-table-column prop="remainingKg" sortable label="İşlemden Sonra Kalan(kg)" width="240px">
         <template v-slot="scope">
           <template v-if="scope.row.remainingKg > 0">
             <p style="font-weight: bold">{{ scope.row.remainingKg }} kg</p>
           </template>
-          <el-tag v-else-if="scope.row.remainingKg == 0" type="success"> Tamamı Teslim Edildi </el-tag>
+          <el-tag v-else-if="scope.row.remainingKg == 0" type="success">
+            Tamamı Teslim Edildi
+          </el-tag>
           <el-tag v-else type="danger"> Kota Aşımı: {{ scope.row.remainingKg }} kg </el-tag>
         </template>
       </el-table-column>
@@ -473,6 +479,7 @@ export default {
   mixins: [globalMixin],
   data() {
     return {
+      loading: false,
       dialogVisible: false,
       editingAccounting: false,
       isShowDetail: false,
@@ -532,6 +539,22 @@ export default {
     // Yeni işlem popup'ını aç
     if (this.$route.params?.type === 'add') {
       await this.isOpenDialog('add', user)
+    }
+  },
+  watch: {
+    '$route.params.user': {
+      handler: async function (newVal) {
+        if (newVal) {
+          this.routeUser = newVal
+          await this.fetchAllProducts()
+          await this.getAllCustomerBalance()
+          await this.getAllCustomerBalanceExtract()
+          if (this.$route.params?.type === 'add') {
+            await this.isOpenDialog('add', newVal)
+          }
+        }
+      },
+      deep: true
     }
   },
   computed: {
@@ -656,7 +679,8 @@ export default {
           .eq('customer_id', balance.customer_id)
           .eq('season_id', balance.season_id)
 
-        const totalDelivered = deliveries?.reduce((s, d) => s + (d.total_weight_delivered || 0), 0) || 0
+        const totalDelivered =
+          deliveries?.reduce((s, d) => s + (d.total_weight_delivered || 0), 0) || 0
         const correctedRemaining = (balance.total_kg_quota || 0) - totalDelivered
 
         // 3. Veritabanını güncelle
@@ -696,28 +720,30 @@ export default {
       const customerId = this.routeUser?.customerId
       if (!customerId) return
 
-      // 1. Sadece bu müşterinin teslimatlarını çek
-      const { data: deliveries, error: dErr } = await supabase
-        .from('customer_deliveries')
-        .select(
-          `
-          *,
-          customer:customers(full_name, is_closed),
-          season:seasons(name),
-          items:customer_delivery_items(
+      this.loading = true
+      try {
+        // 1. Sadece bu müşterinin teslimatlarını çek
+        const { data: deliveries, error: dErr } = await supabase
+          .from('customer_deliveries')
+          .select(
+            `
             *,
-            product:product_types(*)
+            customer:customers(full_name, is_closed),
+            season:seasons(name),
+            items:customer_delivery_items(
+              *,
+              product:product_types(*)
+            )
+          `
           )
-        `
-        )
-        .eq('tenant_id', this.currentTenantId)
-        .eq('customer_id', customerId)
-        .order('delivery_date', { ascending: false })
+          .eq('tenant_id', this.currentTenantId)
+          .eq('customer_id', customerId)
+          .order('delivery_date', { ascending: false })
 
-      if (dErr) {
-        console.error(dErr)
-        return
-      }
+        if (dErr) {
+          console.error(dErr)
+          return
+        }
 
       // 2. Bu müşterinin güncel bakiyesini çek
       const { data: balances } = await supabase
@@ -751,8 +777,9 @@ export default {
 
         // Bu teslimattan sonraki kalan kota
         // Eğer bu teslimat bizim baktığımız bakiye kaydına aitse, o bakiyenin güncel değerini kullan
-        const isCurrentBalance = userBalance?.id === d.balance_id || userBalance?.season_id === d.season_id
-        const remainingAfterThis = isCurrentBalance ? (currentRemainingMap[mapKey] || 0) : 0
+        const isCurrentBalance =
+          userBalance?.id === d.balance_id || userBalance?.season_id === d.season_id
+        const remainingAfterThis = isCurrentBalance ? currentRemainingMap[mapKey] || 0 : 0
 
         // Bir önceki (daha eski) teslimatın kalanını bulmak için teslim edilen miktarı geri ekle
         if (isCurrentBalance) {
@@ -782,7 +809,12 @@ export default {
       })
 
       // Zaten en yenisi üstte, reverse yapmaya gerek yok
-      this.customerBalanceExtractList = mappedList
+        this.customerBalanceExtractList = mappedList
+      } catch (err) {
+        console.error('Data fetch error:', err)
+      } finally {
+        this.loading = false
+      }
     },
     handlePageChange(page) {
       this.currentPage = page

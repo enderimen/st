@@ -64,10 +64,18 @@
       },
       normalizeToNumber(val) {
         if (val === "" || val == null) return 0;
-        const num =
-          typeof val === "number"
-            ? val
-            : Number(String(val).replace(/\./g, "").replace(",", "."));
+        if (typeof val === "number") return val;
+        
+        let s = String(val).trim();
+        // Eğer string içinde hem nokta hem virgül varsa VEYA 
+        // sadece virgül varsa (tr-TR formatı), o zaman temizleme yapalım.
+        // Ama sadece nokta varsa ve o nokta ondalık ayracı ise (raw string), temizlemeyelim.
+        if (s.includes(",") || (s.split('.').length > 2)) {
+          // tr-TR formatı varsayımı: . binlik, , ondalık
+          s = s.replace(/\./g, "").replace(",", ".");
+        }
+        
+        const num = Number(s);
         return isNaN(num) ? 0 : num;
       },
       clamp(n) {

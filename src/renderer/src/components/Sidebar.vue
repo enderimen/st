@@ -53,17 +53,11 @@
           Tedarikçiler
         </el-menu-item>
       </el-submenu>
-      <el-submenu index="1">
-        <template #title>
-          <i class="el-icon-user"></i>
-          <span>Müşteri Yönetimi</span>
-        </template>
-        <el-menu-item index="/anasayfa/musteriler">
-          <i class="el-icon-s-unfold"></i>
-          Müşteri Listesi
-        </el-menu-item>
-      </el-submenu>
-      <el-submenu index="2">
+      <el-menu-item index="/anasayfa/musteriler">
+        <i class="el-icon-user"></i>
+        Müşteri & Cari Yönetimi
+      </el-menu-item>
+      <!-- <el-submenu index="2">
         <template #title>
           <i class="el-icon-s-finance"></i>
           <span>Cari Yönetimi</span>
@@ -76,7 +70,7 @@
           <i class="el-icon-edit-outline"></i>
           Cari Ekstreleri
         </el-menu-item>
-      </el-submenu>
+      </el-submenu> -->
       <el-submenu index="3">
         <template #title>
           <i class="el-icon-question"></i>
@@ -173,8 +167,8 @@ export default {
     display: flex;
     flex-direction: column;
     background-color: var(--sidebar-bg);
-    width: 240px;
-    min-width: 240px;
+    width: 250px;
+    min-width: 250px;
   }
   &-logo {
     display: flex;

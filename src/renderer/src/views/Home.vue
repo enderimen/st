@@ -13,10 +13,38 @@
       </div>
     </div>
     <div class="charts-container">
-      <apexchart :key="chartKey" type="donut" height="320" :options="chartOptions2" :series="series2"> </apexchart>
-      <apexchart :key="chartKey" type="donut" height="320" :options="chartOptions1" :series="series1"> </apexchart>
-      <apexchart :key="chartKey" type="donut" height="320" :options="chartOptions4" :series="series4"> </apexchart>
-      <apexchart :key="chartKey" type="donut" height="320" :options="chartOptions3" :series="series3"> </apexchart>
+      <apexchart
+        :key="chartKey"
+        type="donut"
+        height="320"
+        :options="chartOptions2"
+        :series="series2"
+      >
+      </apexchart>
+      <apexchart
+        :key="chartKey"
+        type="donut"
+        height="320"
+        :options="chartOptions1"
+        :series="series1"
+      >
+      </apexchart>
+      <apexchart
+        :key="chartKey"
+        type="donut"
+        height="320"
+        :options="chartOptions4"
+        :series="series4"
+      >
+      </apexchart>
+      <apexchart
+        :key="chartKey"
+        type="donut"
+        height="320"
+        :options="chartOptions3"
+        :series="series3"
+      >
+      </apexchart>
       <!-- <apexchart
           type="pie"
           :options="chartOptions6"
@@ -24,7 +52,11 @@
         </apexchart> -->
     </div>
 
+    <div v-if="loading" style="padding: 20px">
+      <el-skeleton :rows="5" animated />
+    </div>
     <el-table
+      v-else
       :data="paginatedData"
       border
       show-summary
@@ -51,7 +83,7 @@
       <el-table-column prop="averagePrice" label="Ortalama Maliyet" sortable>
         <template v-slot="scope"> {{ scope.row.averagePrice | formatNumber }} ₺ </template>
       </el-table-column>
-      <el-table-column prop="createdDate" label="Oluşturulma Tarihi" sortable>
+      <el-table-column prop="createdDate" label="Oluşt. Tarihi" sortable>
         <template v-slot="scope">
           {{ scope.row.createdDate | formatDateWithClock }}
         </template>
@@ -115,6 +147,7 @@ export default {
   mixins: [globalMixin],
   data() {
     return {
+      loading: false,
       currentPage: 1,
       pageSize: 10,
       chartKey: 0,
@@ -565,9 +598,16 @@ export default {
     }
   },
   async mounted() {
-    await this.fetchDashboardData()
-    await this.fetchChartData()
-    await this.fetchSeasonSummaries()
+    this.loading = true
+    try {
+      await this.fetchDashboardData()
+      await this.fetchChartData()
+      await this.fetchSeasonSummaries()
+    } catch (error) {
+      console.error('Dashboard loading error:', error)
+    } finally {
+      this.loading = false
+    }
   },
   computed: {
     getSummaryValue() {
@@ -587,18 +627,13 @@ export default {
         .from('production_outputs')
         .select('quantity, product:product_types!inner(unit_weight, tenant_id)')
         .eq('product_types.tenant_id', this.currentTenantId)
-      
-      const totalProduced = outputs?.reduce((s, o) => {
-        const qty = Number(o.quantity || 0)
-        const weight = Number(o.product?.unit_weight || 0)
-        return s + (qty * weight)
-      }, 0) || 0
 
-      console.log('Dashboard Üretim Verisi:', {
-        count: outputs?.length,
-        totalKg: totalProduced,
-        firstItem: outputs?.[0]
-      })
+      const totalProduced =
+        outputs?.reduce((s, o) => {
+          const qty = Number(o.quantity || 0)
+          const weight = Number(o.product?.unit_weight || 0)
+          return s + qty * weight
+        }, 0) || 0
 
       // 2. Toplam Teslim Edilen (Satılan KG)
       const { data: deliveries } = await supabase
@@ -680,7 +715,7 @@ export default {
 
         const target = `${key}${type}`
         const uWeight = parseInt(p.unit_weight)
-        
+
         if (series[target] && series[target][uWeight] !== undefined) {
           const qty = parseInt(item.quantity || 0)
           if (isAddition) series[target][uWeight] += qty
