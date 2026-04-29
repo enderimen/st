@@ -5,7 +5,12 @@
         <i class="el-icon-edit-outline"></i> {{ routeUser?.name || 'Cari' }} - Cari Ekstreleri
       </h1>
       <div class="header-actions">
-        <el-button type="info" plain icon="el-icon-refresh" @click="syncRemainingQuota"
+        <el-button
+          v-if="!routeUser?.isRetail"
+          type="info"
+          plain
+          icon="el-icon-refresh"
+          @click="syncRemainingQuota"
           >Bakiyeyi Düzelt</el-button
         >
         <el-button type="success" icon="el-icon-notebook-2" @click="newBuyProcess"
@@ -93,15 +98,31 @@
           style="display: flex; align-items: flex-end; padding-bottom: 30px; width: 100%"
         >
           <div
+            v-if="!routeUser?.isRetail"
             style="
               font-weight: bold;
-              font-size: 18px;
+              font-size: 16px;
               color: #409eff;
+              border-left: 2px solid #ebeef5;
               padding-left: 20px;
               margin-left: auto;
             "
           >
             <i class="el-icon-info"></i> Kalan: {{ overallRemainingKg | formatNumber }} KG
+          </div>
+          <div
+            v-else
+            style="
+              font-weight: bold;
+              font-size: 16px;
+              color: #67c23a;
+              border-left: 2px solid #ebeef5;
+              padding-left: 20px;
+              margin-left: auto;
+            "
+          >
+            <i class="el-icon-money"></i> Perakende | Toplam Satış:
+            {{ retailTotalRevenue | formatNumber }} ₺
           </div>
         </el-col>
       </el-row>
@@ -163,11 +184,11 @@
       <el-table-column prop="season" sortable label="Sezon" width="170px"></el-table-column>
       <el-table-column prop="createdAt" sortable label="İşlem Tarihi" width="170px">
         <template v-slot="scope">
-          {{ scope.row.createdAt | formatDate }}
+          <div>{{ scope.row.createdAt | formatDate }}</div>
         </template>
       </el-table-column>
       <el-table-column prop="receivedKg" sortable label="Teslim Edilen(kg)"></el-table-column>
-      <el-table-column prop="remainingKg" sortable label="İşlemden Sonra Kalan(kg)" width="240px">
+      <el-table-column prop="remainingKg" sortable label="İşlem Sonrası Kalan(kg)" width="240px">
         <template v-slot="scope">
           <template v-if="scope.row.remainingKg > 0">
             <p style="font-weight: bold">{{ scope.row.remainingKg }} kg</p>
@@ -217,7 +238,7 @@
           </el-col>
         </el-row>
 
-        <el-row :gutter="16">
+        <el-row :gutter="16" v-if="!formData.isRetail">
           <el-col :span="12">
             <el-form-item label="Bakiye(KG)" class="totalkg">
               <el-input-number
@@ -432,12 +453,12 @@
               </el-row>
             </el-tab-pane>
           </el-tabs>
-          <p class="total-balance" :class="{ red: calcRemainingKG < 0 }">
+          <p class="total-balance" :class="{ red: !formData.isRetail && calcRemainingKG < 0 }">
             Toplam : {{ sumTotalKG }} KG
           </p>
         </div>
 
-        <div class="alert-group">
+        <div class="alert-group" v-if="!formData.isRetail">
           <el-alert
             v-if="calcRemainingKG < 0"
             title="Not: Müşteri için ayrılan kg değerini aştınız."
@@ -451,6 +472,31 @@
           >
           </el-alert>
         </div>
+
+        <template v-if="formData.isRetail">
+          <el-divider content-position="left">Ödeme Bilgileri</el-divider>
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item label="Toplam Satış Tutarı (₺)">
+                <price-input v-model="formData.totalAmount" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="Ödenen Tutar (₺)">
+                <price-input v-model="formData.paidAmount" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="Ödeme Tipi">
+                <el-select v-model="formData.paymentType" style="width: 100%">
+                  <el-option label="Nakit" value="0"></el-option>
+                  <el-option label="Havale / EFT" value="1"></el-option>
+                  <el-option label="Kredi Kartı" value="2"></el-option>
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
       </el-form>
 
       <span slot="footer" class="dialog-footer">
@@ -473,10 +519,12 @@ import moment from 'moment'
 import { formatNumber } from '../utils/helpers'
 import { supabase } from '../utils/supabase'
 import globalMixin from '../mixin/global.mixin.js'
+import PriceInput from '../components/PriceInput.vue'
 
 export default {
   name: 'AccountingProcess',
   mixins: [globalMixin],
+  components: { PriceInput },
   data() {
     return {
       loading: false,
@@ -498,6 +546,7 @@ export default {
       },
       isNewExtract: false,
       routeUser: null,
+      retailTotalRevenue: 0,
       filter: {
         season: '',
         dateRange: [],
@@ -509,6 +558,11 @@ export default {
         totalKg: 0,
         remainingKg: 0,
         balanceId: null,
+        deliveryType: 'wholesale',
+        isRetail: false,
+        totalAmount: 0,
+        paidAmount: 0,
+        paymentType: '0',
         productTypePayload: {
           herbTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 }, // otlu tulum
           plainTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0, kg10: 0, kg25: 0 }, // sade tulum
@@ -652,6 +706,10 @@ export default {
         : 'Yeni Alım İşlemi Oluştur'
     },
     isValidation() {
+      if (this.formData.isRetail) {
+        // Perakende için en az bir ürün girilmiş olmalı
+        return this.sumTotalKG <= 0
+      }
       const rules =
         this.calcRemainingKG < 0 || (this.originalData.remainingKg <= 0 && this.sumTotalKG > 0)
       return rules
@@ -745,71 +803,85 @@ export default {
           return
         }
 
-      // 2. Bu müşterinin güncel bakiyesini çek
-      const { data: balances } = await supabase
-        .from('customer_balances')
-        .select('id, customer_id, season_id, total_kg_quota, remaining_kg_quota')
-        .eq('customer_id', customerId)
+        // 2. Bu müşterinin güncel bakiyesini çek
+        const { data: balances } = await supabase
+          .from('customer_balances')
+          .select('id, customer_id, season_id, total_kg_quota, remaining_kg_quota')
+          .eq('customer_id', customerId)
 
-      // 3. Müşteri+Sezon bazında güncel kalan kotaları al
-      const currentRemainingMap = {}
-      balances?.forEach((b) => {
-        const key = `${b.customer_id}_${b.season_id}`
-        // Eğer bu sezon için mükerrer kayıt varsa, sadece tıkladığımız ID ile eşleşen bakiyeyi başlangıç noktası alalım
-        if (b.id === this.routeUser?.id) {
-          currentRemainingMap[key] = b.remaining_kg_quota || 0
-        } else if (!currentRemainingMap[key]) {
-          // Henüz atanmamışsa (diğer sezonlar için) ata
-          currentRemainingMap[key] = b.remaining_kg_quota || 0
-        }
-      })
+        // 3. Müşteri+Sezon bazında güncel kalan kotaları al
+        const currentRemainingMap = {}
+        balances?.forEach((b) => {
+          const key = `${b.customer_id}_${b.season_id}`
+          // Eğer bu sezon için mükerrer kayıt varsa, sadece tıkladığımız ID ile eşleşen bakiyeyi başlangıç noktası alalım
+          if (b.id === this.routeUser?.id) {
+            currentRemainingMap[key] = b.remaining_kg_quota || 0
+          } else if (!currentRemainingMap[key]) {
+            // Henüz atanmamışsa (diğer sezonlar için) ata
+            currentRemainingMap[key] = b.remaining_kg_quota || 0
+          }
+        })
 
-      // 4. Geriye doğru hesaplama: En yeni teslimattan başlayarak kalan kotayı hesapla
-      const mappedList = deliveries.map((d) => {
-        // Eğer mükerrer kayıt varsa, doğrudan route'tan gelen bakiye ID'sini (veya eşleşen sezonu) baz alalım
-        const userBalance =
-          balances?.find((b) => b.id === this.routeUser?.id) ||
-          balances?.find((b) => b.customer_id === d.customer_id && b.season_id === d.season_id)
+        // 4. Geriye doğru hesaplama: En yeni teslimattan başlayarak kalan kotayı hesapla
+        const mappedList = deliveries.map((d) => {
+          // Eğer mükerrer kayıt varsa, doğrudan route'tan gelen bakiye ID'sini (veya eşleşen sezonu) baz alalım
+          const userBalance =
+            balances?.find((b) => b.id === this.routeUser?.id) ||
+            balances?.find((b) => b.customer_id === d.customer_id && b.season_id === d.season_id)
 
-        const mapKey = `${d.customer_id}_${d.season_id}`
-        const totalQuota = userBalance?.total_kg_quota || 0
-        const deliveredKg = d.total_weight_delivered || 0
+          const mapKey = `${d.customer_id}_${d.season_id}`
+          const totalQuota = userBalance?.total_kg_quota || 0
+          const deliveredKg = d.total_weight_delivered || 0
 
-        // Bu teslimattan sonraki kalan kota
-        // Eğer bu teslimat bizim baktığımız bakiye kaydına aitse, o bakiyenin güncel değerini kullan
-        const isCurrentBalance =
-          userBalance?.id === d.balance_id || userBalance?.season_id === d.season_id
-        const remainingAfterThis = isCurrentBalance ? currentRemainingMap[mapKey] || 0 : 0
+          // Bu teslimattan sonraki kalan kota
+          // Eğer bu teslimat bizim baktığımız bakiye kaydına aitse, o bakiyenin güncel değerini kullan
+          const isCurrentBalance =
+            userBalance?.id === d.balance_id || userBalance?.season_id === d.season_id
+          const remainingAfterThis = isCurrentBalance ? currentRemainingMap[mapKey] || 0 : 0
 
-        // Bir önceki (daha eski) teslimatın kalanını bulmak için teslim edilen miktarı geri ekle
-        if (isCurrentBalance) {
-          currentRemainingMap[mapKey] = (currentRemainingMap[mapKey] || 0) + deliveredKg
-        }
+          // Bir önceki (daha eski) teslimatın kalanını bulmak için teslim edilen miktarı geri ekle
+          if (isCurrentBalance) {
+            currentRemainingMap[mapKey] = (currentRemainingMap[mapKey] || 0) + deliveredKg
+          }
 
-        return {
-          id: d.id,
-          balanceId: userBalance?.id,
-          customerId: d.customer_id,
-          name: d.customer?.full_name,
-          seasonId: d.season_id,
-          season: d.season?.name,
-          createdAt: d.delivery_date,
-          receivedKg: deliveredKg,
-          totalKg: totalQuota,
-          remainingKg: remainingAfterThis,
-          isClosing: d.customer?.is_closed,
-          detailList: d.items?.map((i) => ({
-            productTypeId: i.product_type_id,
-            productTypeName: i.product?.category,
-            unitWeight: i.product?.unit_weight,
-            quantity: i.quantity,
-            isGrassy: i.product?.is_grassy
-          }))
-        }
-      })
+          return {
+            id: d.id,
+            balanceId: userBalance?.id,
+            customerId: d.customer_id,
+            name: d.customer?.full_name,
+            seasonId: d.season_id,
+            season: d.season?.name,
+            createdAt: d.delivery_date,
+            receivedKg: deliveredKg,
+            totalKg: totalQuota,
+            remainingKg: remainingAfterThis,
+            isClosing: d.customer?.is_closed,
+            isRetail: d.customer?.is_retail,
+            deliveryType: d.delivery_type || 'wholesale',
+            detailList: d.items?.map((i) => ({
+              productTypeId: i.product_type_id,
+              productTypeName: i.product?.category,
+              unitWeight: i.product?.unit_weight,
+              quantity: i.quantity,
+              isGrassy: i.product?.is_grassy
+            }))
+          }
+        })
 
-      // Zaten en yenisi üstte, reverse yapmaya gerek yok
+        // Zaten en yenisi üstte, reverse yapmaya gerek yok
         this.customerBalanceExtractList = mappedList
+
+        // 5. Perakende ise toplam satış tutarını hesapla
+        if (this.routeUser?.isRetail) {
+          const { data: transactions } = await supabase
+            .from('customer_transactions')
+            .select('paid_amount')
+            .eq('customer_id', customerId)
+            .eq('transaction_type', 'retail_sale')
+
+          this.retailTotalRevenue =
+            transactions?.reduce((sum, t) => sum + (t.paid_amount || 0), 0) || 0
+        }
       } catch (err) {
         console.error('Data fetch error:', err)
       } finally {
@@ -859,12 +931,16 @@ export default {
       if (!source) return
 
       this.formData.fullName = source.name
-      this.formData.seasonName = source.season
+      this.formData.isRetail = source.isRetail || false
+      const defaultSeason = this.getSeasonList?.[this.getSeasonList.length - 1]
+      this.formData.seasonName = source.season || defaultSeason?.label || ''
       this.formData.totalKg = source.totalKg || 0
       this.formData.remainingKg = source.remainingKg || 0
+      this.formData.deliveryType = source.isRetail ? 'retail' : 'wholesale'
       this.originalData.totalKg = source.totalKg || 0
       this.originalData.remainingKg = source.remainingKg || 0
       this.formData.balanceId = source.balanceId || source.id
+      this.formData.deliveryType = source.deliveryType || 'wholesale'
 
       if (this.editingAccounting) {
         this.formData.productTypePayload = this.mapOutputToForm(source.detailList)
@@ -895,6 +971,11 @@ export default {
         totalKg: 0,
         balanceId: null,
         remainingKg: 0,
+        deliveryType: 'wholesale',
+        isRetail: false,
+        totalAmount: 0,
+        paidAmount: 0,
+        paymentType: '0',
         productTypePayload: {
           herbTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 },
           plainTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0, kg10: 0, kg25: 0 },
@@ -1129,17 +1210,19 @@ export default {
           }
         }
 
-        if (!balance) {
+        if (!balance && !this.formData.isRetail) {
           throw new Error(
             'Müşteriye ait cari bakiye kaydı bulunamadı. Lütfen önce müşteriye bu sezon için cari tanımlayın.'
           )
         }
 
         if (this.editingAccounting) {
-          // İade ve yeni düşüş hesabı
-          const oldWeight = this.outputDetail.receivedKg || 0
-          const diff = oldWeight - totalWeight
-          const newRemaining = Number(balance.remaining_kg_quota || 0) + diff
+          // Edit durumunda kota iadesi ve tekrar düşüş hesabı
+          const oldWeight =
+            this.outputDetail.deliveryType === 'retail' ? 0 : this.outputDetail.receivedKg || 0
+          const newWeight = this.formData.deliveryType === 'retail' ? 0 : totalWeight
+          const diff = oldWeight - newWeight
+          const newRemaining = balance ? Number(balance.remaining_kg_quota || 0) + diff : 0
 
           if (totalWeight === 0) {
             // Tüm ürünler çıkarılmış, işlemi tamamen iptal et (sil)
@@ -1153,7 +1236,10 @@ export default {
             // 1. Deliveries güncelle
             await supabase
               .from('customer_deliveries')
-              .update({ total_weight_delivered: totalWeight })
+              .update({
+                total_weight_delivered: totalWeight,
+                delivery_type: this.formData.deliveryType
+              })
               .eq('id', this.outputDetail.id)
 
             // 2. Items sil ve ekle
@@ -1174,17 +1260,23 @@ export default {
             }
           }
 
-          // 3. Balance güncelle
-          await supabase
-            .from('customer_balances')
-            .update({ remaining_kg_quota: newRemaining })
-            .eq('id', balanceId)
+          // 3. Balance güncelle (Sadece bakiye varsa)
+          if (balance) {
+            await supabase
+              .from('customer_balances')
+              .update({ remaining_kg_quota: newRemaining })
+              .eq('id', balanceId)
+          }
         } else {
           // Yeni kayıt
           if (totalWeight === 0) {
             throw new Error('Lütfen teslim edilecek en az bir ürün seçiniz.')
           }
-          const newRemaining = Number(balance.remaining_kg_quota || 0) - totalWeight
+          // Toptan satışsa kotadan düş, perakendeyse düşme
+          const newRemaining =
+            this.formData.deliveryType === 'retail'
+              ? Number(balance?.remaining_kg_quota || 0)
+              : Number(balance?.remaining_kg_quota || 0) - totalWeight
 
           // 1. Deliveries ekle
           const { data: delivery, error: dErr } = await supabase
@@ -1192,10 +1284,14 @@ export default {
             .insert([
               {
                 tenant_id: this.currentTenantId,
-                customer_id: balance.customer_id,
-                season_id: balance.season_id,
+                customer_id: balance ? balance.customer_id : this.routeUser.customerId,
+                season_id: balance
+                  ? balance.season_id
+                  : this.filter.season ||
+                    this.getSeasonList?.[this.getSeasonList.length - 1]?.value,
                 total_weight_delivered: totalWeight,
-                delivery_date: new Date()
+                delivery_date: new Date(),
+                delivery_type: this.formData.deliveryType
               }
             ])
             .select()
@@ -1212,11 +1308,31 @@ export default {
             }))
           )
 
-          // 3. Balance güncelle
-          await supabase
-            .from('customer_balances')
-            .update({ remaining_kg_quota: newRemaining })
-            .eq('id', balanceId)
+          // 3. Retail ise Transaction ekle
+          if (this.formData.isRetail) {
+            const { error: tErr } = await supabase.from('customer_transactions').insert([
+              {
+                tenant_id: this.currentTenantId,
+                customer_id: this.routeUser.customerId,
+                season_id:
+                  this.filter.season || this.getSeasonList?.[this.getSeasonList.length - 1]?.value,
+                amount_kg: totalWeight,
+                paid_amount: this.formData.paidAmount,
+                payment_type: this.formData.paymentType,
+                transaction_type: 'retail_sale',
+                notes: 'Dükkan Perakende Satışı'
+              }
+            ])
+            if (tErr) throw tErr
+          }
+
+          // 4. Balance güncelle (Sadece perakende değilse ve bakiye varsa)
+          if (balance && this.formData.deliveryType !== 'retail') {
+            await supabase
+              .from('customer_balances')
+              .update({ remaining_kg_quota: newRemaining })
+              .eq('id', balanceId)
+          }
         }
 
         this.$notify({

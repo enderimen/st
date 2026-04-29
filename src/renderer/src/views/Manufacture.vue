@@ -74,6 +74,17 @@
               <el-table-column prop="paidAmount" label="Ödenen" width="110">
                 <template v-slot="s">{{ s.row.paidAmount | formatNumber }} ₺</template>
               </el-table-column>
+              <el-table-column label="Kalan" width="110">
+                <template v-slot="s">
+                  <el-tag
+                    :type="s.row.totalCost - s.row.paidAmount > 0 ? 'danger' : 'success'"
+                    size="mini"
+                    effect="plain"
+                  >
+                    {{ (s.row.totalCost - s.row.paidAmount) | formatNumber }} ₺
+                  </el-tag>
+                </template>
+              </el-table-column>
               <el-table-column prop="paymentType" label="Ödeme Türü" width="120"></el-table-column>
               <el-table-column prop="notes" label="Not">
                 <template v-slot="s">{{ s.row.notes }}</template>

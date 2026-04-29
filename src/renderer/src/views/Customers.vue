@@ -51,6 +51,8 @@
       border
       style="width: 100%"
       empty-text="Müşteri bulunamadı"
+      show-summary
+      :summary-method="getSummary"
     >
       <el-table-column label="Kayıt Tarihi" width="130" sortable prop="createdAt">
         <template v-slot="scope">
@@ -59,10 +61,11 @@
       </el-table-column>
       <el-table-column prop="fullName" sortable label="Ad Soyad">
         <template v-slot="scope">
-          <span class="upper-text">{{ scope.row.fullName }}</span>
+          <el-tag v-if="scope.row.isRetail" type="warning">{{ scope.row.fullName }}</el-tag>
+          <span v-else class="upper-text">{{ scope.row.fullName }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="phone" sortable label="Telefon Numarası"></el-table-column>
+      <el-table-column prop="phone" sortable label="Telefon" width="140"></el-table-column>
       <el-table-column prop="address" sortable label="Adres" width="90">
         <template v-slot="scope">
           <div style="display: flex; align-items: center; gap: 8px">
@@ -86,21 +89,28 @@
       </el-table-column>
       <el-table-column label="Toplam Hak" width="120">
         <template v-slot="scope">
-          <span v-if="scope.row.hasBalance">{{ scope.row.balanceInfo.totalKg }} KG</span>
+          <el-tag v-if="scope.row.isRetail" type="warning" size="mini">Perakende</el-tag>
+          <span v-else-if="scope.row.hasBalance">{{ scope.row.balanceInfo.totalKg }} KG</span>
           <span v-else>-</span>
         </template>
       </el-table-column>
       <el-table-column label="Kalan (KG)" width="120">
         <template v-slot="scope">
-          <b v-if="scope.row.hasBalance">{{ scope.row.balanceInfo.remainingKg }} KG</b>
+          <el-tag v-if="scope.row.isRetail" type="warning" size="mini">Dükkan Satışı</el-tag>
+          <b v-else-if="scope.row.hasBalance">{{ scope.row.balanceInfo.remainingKg }} KG</b>
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="Cari Durumu" width="120">
+      <el-table-column label="Cari Durumu" width="150">
         <template v-slot="scope">
-          <el-tag :type="scope.row.balanceInfo.isClosed ? 'danger' : 'success'" size="small">
+          <el-tag
+            v-if="scope.row.hasBalance"
+            :type="scope.row.balanceInfo.isClosed ? 'danger' : 'success'"
+            size="small"
+          >
             {{ scope.row.balanceInfo.isClosed ? 'Pasif' : 'Aktif' }}
           </el-tag>
+          <el-tag v-else type="info" size="small">İşlem Bulunmuyor</el-tag>
         </template>
       </el-table-column>
       <el-table-column fixed="right" label="İşlem" width="325">
@@ -120,21 +130,23 @@
             >Yeni İşlem</el-button
           >
 
-          <el-tooltip
-            v-if="!scope.row.hasBalance"
-            class="item"
-            effect="dark"
-            content="Carisi Bulunmuyor"
-            placement="top-start"
+          <el-button
+            v-if="!scope.row.hasBalance && !scope.row.isRetail"
+            type="warning"
+            size="small"
+            icon="el-icon-circle-plus"
+            @click="createBalance(scope.row)"
+            >Cari Oluştur</el-button
           >
-            <el-button
-              type="warning"
-              size="small"
-              icon="el-icon-circle-plus"
-              @click="createBalance(scope.row)"
-              >Cari Oluştur</el-button
-            >
-          </el-tooltip>
+
+          <el-button
+            v-if="scope.row.isRetail"
+            size="small"
+            icon="el-icon-shopping-cart-2"
+            style="width: 112px; background-color: #000; color: #fff"
+            @click="retailSale(scope.row)"
+            >Perakende</el-button
+          >
 
           <el-button
             type="primary"
@@ -198,116 +210,134 @@
             </el-form-item>
           </el-col>
         </el-row>
-
-        <el-divider content-position="left">Cari Durumu</el-divider>
         <el-row :gutter="16">
-          <el-col :span="6">
-            <el-form-item label="Sezon">
-              <el-select v-model="formData.seasonId" placeholder="Sezon Seçin" style="width: 100%">
-                <el-option
-                  v-for="item in getSeasonList"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                ></el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="4">
-            <el-form-item label="Toplam Kota">
-              <el-input-number
-                v-model="formData.totalKgQuota"
-                :min="formData.totalDelivered || 0"
-                controls-position="right"
-                style="width: 100%"
-                :disabled="!editingCustomer"
-                @change="updateRemainingQuota"
-              ></el-input-number>
-            </el-form-item>
-          </el-col>
-          <el-col :span="4">
-            <el-form-item label="Kalan Kota">
-              <el-tag
-                :type="formData.remainingKgQuota > 0 ? 'success' : 'danger'"
-                style="
-                  width: 100%;
-                  text-align: center;
-                  height: 40px;
-                  line-height: 40px;
-                  font-size: 14px;
-                "
-              >
-                {{ formatCount(formData.remainingKgQuota) }} KG
-              </el-tag>
-            </el-form-item>
-          </el-col>
-          <el-col :span="5">
-            <el-form-item label="Toplam Ödenen">
-              <price-input
-                v-model="formData.totalPaidAmount"
-                :disabled="!editingCustomer"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="5">
-            <el-form-item label="Cari Aktif Mi?">
-              <el-switch
-                v-model="formData.isClosed"
-                :active-value="false"
-                :inactive-value="true"
-                active-text="Aktif"
-                inactive-text="Pasif"
-              ></el-switch>
+          <el-col :span="12">
+            <el-form-item label="Müşteri Tipi">
+              <el-radio-group v-model="formData.isRetail">
+                <el-radio :label="false">Toptan (Müşteri)</el-radio>
+                <el-radio :label="true">Perakende (Dükkan)</el-radio>
+              </el-radio-group>
             </el-form-item>
           </el-col>
         </el-row>
 
-        <el-divider content-position="left">Yeni Kota Alımı / Ödeme</el-divider>
-        <el-row :gutter="16" :class="['transaction-form', { disabled: formData.isClosed }]">
-          <el-col :span="6">
-            <el-form-item label="İşlem Tarihi">
-              <el-date-picker
-                v-model="formData.newTransaction.transactionDate"
-                type="date"
-                placeholder="Tarih Seçin"
-                style="width: 100%"
-                :disabled="formData.isClosed"
-              ></el-date-picker>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="Eklenecek KG">
-              <el-input-number
-                v-model="formData.newTransaction.amountKg"
-                :min="0"
-                :precision="2"
-                style="width: 100%"
-                :disabled="formData.isClosed"
-              ></el-input-number>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="Ödenen Tutar">
-              <price-input
-                v-model="formData.newTransaction.paidAmount"
-                :disabled="formData.isClosed"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="Ödeme Tipi">
-              <el-select
-                v-model="formData.newTransaction.paymentType"
-                style="width: 100%"
-                :disabled="formData.isClosed"
-              >
-                <el-option label="Nakit" value="0"></el-option>
-                <el-option label="Havale / EFT" value="1"></el-option>
-                <el-option label="Kredi Kartı" value="2"></el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <template v-if="!formData.isRetail">
+          <el-divider content-position="left">Cari Durumu</el-divider>
+          <el-row :gutter="16">
+            <el-col :span="6">
+              <el-form-item label="Sezon">
+                <el-select
+                  v-model="formData.seasonId"
+                  placeholder="Sezon Seçin"
+                  style="width: 100%"
+                >
+                  <el-option
+                    v-for="item in getSeasonList"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  ></el-option>
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="4">
+              <el-form-item label="Toplam Kota">
+                <el-input-number
+                  v-model="formData.totalKgQuota"
+                  :min="formData.totalDelivered || 0"
+                  controls-position="right"
+                  style="width: 100%"
+                  :disabled="!editingCustomer || !formData.hasBalance"
+                  @change="updateRemainingQuota"
+                ></el-input-number>
+              </el-form-item>
+            </el-col>
+            <el-col :span="4">
+              <el-form-item label="Kalan Kota">
+                <el-tag
+                  :type="formData.remainingKgQuota > 0 ? 'success' : 'danger'"
+                  style="
+                    width: 100%;
+                    text-align: center;
+                    height: 40px;
+                    line-height: 40px;
+                    font-size: 14px;
+                  "
+                >
+                  {{ formatCount(formData.remainingKgQuota) }} KG
+                </el-tag>
+              </el-form-item>
+            </el-col>
+            <el-col :span="5">
+              <el-form-item label="Toplam Ödenen">
+                <price-input
+                  v-model="formData.totalPaidAmount"
+                  :disabled="!editingCustomer || !formData.hasBalance"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="5">
+              <el-form-item label="Cari Aktif Mi?">
+                <el-switch
+                  v-model="formData.isClosed"
+                  :active-value="false"
+                  :inactive-value="true"
+                  active-text="Aktif"
+                  inactive-text="Pasif"
+                ></el-switch>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
+
+        <template v-if="!formData.isRetail">
+          <el-divider content-position="left">Yeni Kota Alımı / Ödeme</el-divider>
+          <el-row :gutter="16" :class="['transaction-form', { disabled: formData.isClosed }]">
+            <el-col :span="6">
+              <el-form-item label="İşlem Tarihi">
+                <el-date-picker
+                  v-model="formData.newTransaction.transactionDate"
+                  type="date"
+                  placeholder="Tarih Seçin"
+                  style="width: 100%"
+                  :disabled="formData.isClosed"
+                ></el-date-picker>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="Eklenecek KG">
+                <el-input-number
+                  v-model="formData.newTransaction.amountKg"
+                  :min="0"
+                  :precision="2"
+                  style="width: 100%"
+                  :disabled="formData.isClosed"
+                ></el-input-number>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="Ödenen Tutar">
+                <price-input
+                  v-model="formData.newTransaction.paidAmount"
+                  :disabled="formData.isClosed"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="Ödeme Tipi">
+                <el-select
+                  v-model="formData.newTransaction.paymentType"
+                  style="width: 100%"
+                  :disabled="formData.isClosed"
+                >
+                  <el-option label="Nakit" value="0"></el-option>
+                  <el-option label="Havale / EFT" value="1"></el-option>
+                  <el-option label="Kredi Kartı" value="2"></el-option>
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
 
         <el-divider v-if="transactionHistory.length > 0" content-position="left"
           >İşlem Geçmişi</el-divider
@@ -422,6 +452,7 @@ export default {
         totalPaidAmount: 0,
         paymentType: '0',
         isClosed: false,
+        isRetail: false,
         // New transaction fields
         newTransaction: {
           amountKg: 0,
@@ -489,6 +520,31 @@ export default {
     }
   },
   methods: {
+    getSummary(param) {
+      const { columns } = param
+      const sums = []
+      columns.forEach((column, index) => {
+        if (index === 0) {
+          sums[index] = 'TOPLAM'
+          return
+        }
+
+        if (column.label === 'Kalan (KG)') {
+          const totalRemaining = this.filteredData.reduce((acc, curr) => {
+            return acc + (curr.hasBalance ? curr.balanceInfo.remainingKg || 0 : 0)
+          }, 0)
+          sums[index] = this.formatCount(totalRemaining) + ' KG'
+        } else if (column.label === 'Toplam Hak') {
+          const totalQuota = this.filteredData.reduce((acc, curr) => {
+            return acc + (curr.hasBalance ? curr.balanceInfo.totalKg || 0 : 0)
+          }, 0)
+          sums[index] = this.formatCount(totalQuota) + ' KG'
+        } else {
+          sums[index] = ''
+        }
+      })
+      return sums
+    },
     getTransactionSummaries(param) {
       const { columns, data } = param
       const sums = []
@@ -574,7 +630,8 @@ export default {
             : null,
           tenant_id: item.tenant_id,
           createdAt: item.created_at,
-          isClosed: item.is_closed
+          isClosed: item.is_closed,
+          isRetail: item.is_retail
         }
       })
       this.loading = false
@@ -632,16 +689,37 @@ export default {
         })
     },
     handleClick(row) {
-      if (!row.hasBalance) return
-      const user = {
-        id: row.balanceInfo.id,
-        customerId: row.id,
-        name: row.fullName,
-        season: row.balanceInfo.seasonName,
-        totalKg: row.balanceInfo.totalKg,
-        remainingKg: row.balanceInfo.remainingKg
-      }
+      if (!row.hasBalance && !row.isRetail) return
+      const user = row.isRetail
+        ? {
+            id: row.id,
+            customerId: row.id,
+            name: row.fullName,
+            isRetail: true
+          }
+        : {
+            id: row.balanceInfo.id,
+            customerId: row.id,
+            name: row.fullName,
+            season: row.balanceInfo.seasonName,
+            totalKg: row.balanceInfo.totalKg,
+            remainingKg: row.balanceInfo.remainingKg
+          }
       this.$router.push({ name: 'AccountingProcess', params: { user } })
+    },
+    retailSale(row) {
+      this.$router.push({
+        name: 'AccountingProcess',
+        params: {
+          user: {
+            id: row.id,
+            customerId: row.id,
+            name: row.fullName,
+            isRetail: true
+          },
+          type: 'add'
+        }
+      })
     },
     useBalance(row) {
       if (!row.hasBalance) return
@@ -697,6 +775,7 @@ export default {
           remainingKgQuota: row.balanceInfo?.remainingKg || 0,
           totalDelivered: (row.balanceInfo?.totalKg || 0) - (row.balanceInfo?.remainingKg || 0),
           totalPaidAmount: row.balanceInfo?.totalPaid || 0,
+          isRetail: row.isRetail || false,
           paymentType: '0',
           isClosed: row.balanceInfo?.isClosed || false,
           newTransaction: {
@@ -728,6 +807,7 @@ export default {
           totalPaidAmount: 0,
           paymentType: '0',
           isClosed: false,
+          isRetail: false,
           newTransaction: {
             amountKg: 0,
             paidAmount: 0,
@@ -773,7 +853,8 @@ export default {
               .update({
                 full_name: this.formData.fullName,
                 phone: this.formData.phone,
-                address: this.formData.address
+                address: this.formData.address,
+                is_retail: this.formData.isRetail
               })
               .eq('id', customerId)
             if (error) throw error
@@ -785,7 +866,8 @@ export default {
                   full_name: this.formData.fullName,
                   phone: this.formData.phone,
                   address: this.formData.address,
-                  tenant_id: this.currentTenantId
+                  tenant_id: this.currentTenantId,
+                  is_retail: this.formData.isRetail
                 }
               ])
               .select()
@@ -804,25 +886,27 @@ export default {
 
           if (nt.amountKg > 0 || nt.paidAmount > 0 || quotaChanged || paidChanged) {
             if (!this.formData.seasonId) {
-              this.$message.warning('Yeni işlem için lütfen bir sezon seçin.')
+              this.$message.warning('İşlem için lütfen bir sezon seçin.')
               return
             }
 
-            // Transaction kaydı
-            const { error: tErr } = await supabase.from('customer_transactions').insert([
-              {
-                customer_id: customerId,
-                season_id: this.formData.seasonId,
-                tenant_id: this.currentTenantId,
-                amount_kg: nt.amountKg,
-                paid_amount: nt.paidAmount,
-                payment_type: nt.paymentType,
-                transaction_type: 'quota_purchase'
-              }
-            ])
-            if (tErr) throw tErr
+            // Transaction kaydı - Sadece yeni değerler girilmişse (0 değilse)
+            if (nt.amountKg > 0 || nt.paidAmount > 0) {
+              const { error: tErr } = await supabase.from('customer_transactions').insert([
+                {
+                  customer_id: customerId,
+                  season_id: this.formData.seasonId,
+                  tenant_id: this.currentTenantId,
+                  amount_kg: nt.amountKg,
+                  paid_amount: nt.paidAmount,
+                  payment_type: nt.paymentType,
+                  transaction_type: 'quota_purchase'
+                }
+              ])
+              if (tErr) throw tErr
+            }
 
-            // Bakiye güncelleme/oluşturma (Upsert)
+            // Bakiye güncelleme/oluşturma (Upsert) logic continues...
             // Önce mevcut bakiyeyi çekelim (varsa)
             const { data: existingBalance } = await supabase
               .from('customer_balances')
