@@ -163,6 +163,7 @@
               size="small"
               circle
               icon="el-icon-plus"
+              :disabled="scope.row.isCompleted"
               @click="openInputDialog(scope.row)"
             ></el-button>
             <el-tooltip effect="dark" content="Üretim Çıktıları" placement="top-start">

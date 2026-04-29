@@ -1,19 +1,21 @@
-import http from '../http'
+import { supabase } from '../utils/supabase'
 
 const state = {
-  seasonList: null
+  seasonList: []
 }
 
 const getters = {
-  getSeasonWithProductList: state => state.seasonList,
+  getSeasonWithProductList: (state) => state.seasonList,
   getSeasonList(state) {
-    return state.seasonList?.map(season => {
-      return {
-        value: season?.id?.toString(),
-        label: season.name
-      }
-    }) || [];
-  },
+    return (
+      state.seasonList?.map((season) => {
+        return {
+          value: season?.id?.toString(),
+          label: season.name
+        }
+      }) || []
+    )
+  }
 }
 
 const mutations = {
@@ -24,39 +26,35 @@ const mutations = {
     state.seasonList = seasonList
   },
   DELETE_SEASON(state, seasonId) {
-    state.seasonList = state.seasonList?.filter(season => season.id != seasonId);
+    state.seasonList = state.seasonList?.filter((season) => season.id != seasonId)
   },
   UPDATE_SEASON(state, updatedSeason) {
-    const index = state.seasonList?.findIndex(season => season.id === updatedSeason.id);
+    const index = state.seasonList?.findIndex((season) => season.id === updatedSeason.id)
     if (index !== -1) {
-      state.seasonList?.splice(index, 1, updatedSeason);
+      state.seasonList?.splice(index, 1, updatedSeason)
     }
   },
   ADD_SEASON(state, newSeason) {
-    state.seasonList.push(newSeason);
+    state.seasonList.push(newSeason)
   }
 }
 
 const actions = {
   async fetchAllSeasons({ commit }) {
     try {
-        const { data } = await http.get('/Season');
+      const tenantId = localStorage.getItem('tenant_id')
+      const { data, error } = await supabase
+        .from('seasons')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false })
 
-        const mappedData = data.map(season => ({
-            "id": season.id?.toString(),
-            "name": season.name,
-            "createdDate": season.createdDate,
-            "totalInputWeight": season.totalInputWeight,
-            "totalOutputWeight": season.totalOutputWeight,
-            "lossKg": season.lossKg,
-            "averagePrice": season.averageKgPrice
-        }));
+      if (error) throw error
 
-        commit('SET_SEASON_LIST', mappedData);
-        return data
-    }
-    catch (err) {
-        throw err
+      commit('SET_SEASON_LIST', data || [])
+      return data
+    } catch (err) {
+      throw err
     }
   },
   async deleteSeason({ commit }, seasonId) {

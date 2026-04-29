@@ -589,11 +589,16 @@ export default {
         .eq('product_types.tenant_id', this.currentTenantId)
       
       const totalProduced = outputs?.reduce((s, o) => {
-        const weight = o.product?.unit_weight || 0
-        return s + (o.quantity * weight)
+        const qty = Number(o.quantity || 0)
+        const weight = Number(o.product?.unit_weight || 0)
+        return s + (qty * weight)
       }, 0) || 0
 
-      console.log('Dashboard Üretim Verisi:', outputs?.length, 'Toplam KG:', totalProduced)
+      console.log('Dashboard Üretim Verisi:', {
+        count: outputs?.length,
+        totalKg: totalProduced,
+        firstItem: outputs?.[0]
+      })
 
       // 2. Toplam Teslim Edilen (Satılan KG)
       const { data: deliveries } = await supabase
@@ -606,12 +611,13 @@ export default {
       // 3. Mevcut Stok (Üretilen - Teslim Edilen)
       this.summaryData.totalProducedKg = totalProduced - totalDelivered
 
-      // 4. Rezerve Edilen Ürün (Müşteri Kotaları Toplamı)
+      // 4. Rezerve Edilen Ürün (Müşteri Kotaları Toplamı - Kalan)
       const { data: balances } = await supabase
         .from('customer_balances')
-        .select('total_kg_quota')
+        .select('remaining_kg_quota')
         .eq('tenant_id', this.currentTenantId)
-      this.summaryData.reservedKg = balances?.reduce((s, b) => s + (b.total_kg_quota || 0), 0) || 0
+      this.summaryData.reservedKg =
+        balances?.reduce((s, b) => s + (b.remaining_kg_quota || 0), 0) || 0
 
       // 5. İşlenmemiş Ürün (Devam Edenler)
       const { data: pending } = await supabase

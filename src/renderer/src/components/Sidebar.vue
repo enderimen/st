@@ -5,8 +5,13 @@
         v-if="tenantLogoUrl"
         style="width: 80px; height: 80px"
         :src="tenantLogoUrl"
-        fit="cover"></el-image>
-      <i v-else class="el-icon-office-building" style="font-size: 40px; color: #fff; margin-bottom: 10px;"></i>
+        fit="cover"
+      ></el-image>
+      <i
+        v-else
+        class="el-icon-office-building"
+        style="font-size: 40px; color: #fff; margin-bottom: 10px"
+      ></i>
 
       <div>
         <p>{{ tenantName }}</p>
@@ -113,29 +118,31 @@ export default {
       localStorage.removeItem('user_full_name')
       localStorage.removeItem('user_role')
       localStorage.removeItem('user_id')
-      
+
+      window.api.send('logout')
       this.$router.push({ name: 'Login' })
     },
     open() {
       this.$confirm('Çıkış yapmak istediğinden emin misiniz?', 'Oturum Kapatma İşlemi', {
         distinguishCancelAndClose: true,
         confirmButtonText: 'Evet, Kapat',
-        cancelButtonText: 'İptal Et',
+        cancelButtonText: 'İptal Et'
       })
-      .then(() => {
-        this.logout();
-      })
-      .catch(action => {
-        this.$notify({
-          title: 'Bilgi',
-          type: 'info',
-          message: action === 'cancel' ? 'Oturum kapatma işlemi iptal edildi' : 'İşlem iptal edildi',
-          duration: 3000,
-          position: 'top-right',
-        });
-      });
+        .then(() => {
+          this.logout()
+        })
+        .catch((action) => {
+          this.$notify({
+            title: 'Bilgi',
+            type: 'info',
+            message:
+              action === 'cancel' ? 'Oturum kapatma işlemi iptal edildi' : 'İşlem iptal edildi',
+            duration: 3000,
+            position: 'top-right'
+          })
+        })
     }
-  },
+  }
 }
 </script>
   
@@ -147,11 +154,11 @@ export default {
   .el-menu-item {
     display: flex;
     align-items: center;
-    letter-spacing: .5px;
+    letter-spacing: 0.5px;
 
     &.is-active {
       font-weight: 600;
-      [class^="el-icon-"] {
+      [class^='el-icon-'] {
         color: inherit !important;
       }
     }
@@ -163,7 +170,7 @@ export default {
   min-width: 200px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   border: none !important;
-  
+
   &-content {
     display: flex;
     flex-direction: column;

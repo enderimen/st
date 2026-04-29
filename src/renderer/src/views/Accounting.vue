@@ -122,14 +122,13 @@
       </el-table-column>
       <el-table-column prop="remainingKg" sortable label="Kalan(kg)">
         <template v-slot="scope">
-          <template v-if="scope.row.remainingKg">
+          <template v-if="scope.row.remainingKg > 0">
             <p style="font-weight: bold">{{ scope.row.remainingKg }}</p>
           </template>
-          <el-tag
-            v-else
-            type="success">
+          <el-tag v-else-if="scope.row.remainingKg == 0" type="success">
             Tamamı Teslim Edildi
           </el-tag>
+          <el-tag v-else type="danger"> Kota Aşımı: {{ scope.row.remainingKg }} </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="isClosing" sortable label="Cari Aktif Mi?" width="140">
@@ -452,7 +451,6 @@ export default {
         isClosing: 'Tümü'
       },
       customerBalanceList: [],
-      seasonList: [],
       search: '',
       customerDetail: null,
       originalData: {
@@ -479,7 +477,6 @@ export default {
     }
   },
   async mounted() {
-    await this.fetchSeasons()
     await this.getAllCustomerBalance()
 
     // Eğer bir yönlendirme ile gelindiyse (Cari Oluştur gibi)
@@ -491,12 +488,6 @@ export default {
     this.filter.search = this.$route.params?.customerName || ''
   },
   computed: {
-    getSeasonList() {
-      return this.seasonList.map((s) => ({
-        label: s.name,
-        value: s.id
-      }))
-    },
     getPaymentNote() {
       return `${this.formData.fullName}, ${this.formData.totalKg} KG ürün karşılığında ${ this.formData.paymentType == "1" ? 'Havale / EFT' : 'Nakit' } yoluyla ${this.getFormatedPurchasedAmount}₺ ödeme yapmıştır.`;
     },
@@ -591,14 +582,10 @@ export default {
   },
   methods: {
     handleClick(row) {
-      this.$router.push({ name: 'AccountingProcess', params: { customerName: row.name } })
+      this.$router.push({ name: 'AccountingProcess', params: { user: row } })
     },
     useBalance(row) {
       this.$router.push({ name: 'AccountingProcess', params: { type: 'add', user: row } })
-    },
-    async fetchSeasons() {
-      const { data } = await supabase.from('seasons').select('*').eq('tenant_id', this.currentTenantId)
-      this.seasonList = data || []
     },
     async getAllCustomerBalance() {
       const { data, error } = await supabase
@@ -628,7 +615,7 @@ export default {
         remainingKg: item.remaining_kg_quota,
         purchasedAmount: item.total_paid_amount,
         paymentType: item.payment_type,
-        isClosing: item.customer?.is_closed, // Müşteri bazlı mı yoksa bakiye bazlı mı kapanıyor? Tabloda bakiye bazlı bir is_closed yoktu, müşteriden aldım.
+        isClosing: !!item.is_closed, // Bakiye bazlı kapanış bilgisini kullan ve null ise false (Aktif) kabul et
         createdAt: item.created_at,
         hasTransaction: true // Detay ekranı için
       }))
@@ -686,12 +673,21 @@ export default {
       this.formData.phone = this.outputDetail.phone
       this.formData.season = this.outputDetail.seasonId?.toString()
       this.formData.isClosing = !this.outputDetail.isClosing
-      this.formData.paymentType = this.outputDetail.paymentType?.toString() || 'Nakit'
-      this.formData.totalKg = this.outputDetail.totalKg || 0
 
-      this.originalData.totalKg = this.outputDetail.totalKg || 0
-      this.originalData.remainingKg = this.outputDetail.remainingKg || 0
-      this.formData.purchasedAmount = this.outputDetail.purchasedAmount || 0
+      // Müşteri tüm hakkını kullanmışsa, yeni dönem için sıfırdan başlat
+      if (this.outputDetail.remainingKg == 0) {
+        this.formData.totalKg = 0
+        this.formData.purchasedAmount = 0
+        this.formData.paymentType = 'Nakit'
+        this.originalData.totalKg = 0
+        this.originalData.remainingKg = 0
+      } else {
+        this.formData.totalKg = this.outputDetail.totalKg || 0
+        this.formData.paymentType = this.outputDetail.paymentType?.toString() || 'Nakit'
+        this.formData.purchasedAmount = this.outputDetail.purchasedAmount || 0
+        this.originalData.totalKg = this.outputDetail.totalKg || 0
+        this.originalData.remainingKg = this.outputDetail.remainingKg || 0
+      }
     },
     async saveAccounting() {
       if (!this.formData.season) {
@@ -706,7 +702,7 @@ export default {
         season_id: this.formData.season,
         total_kg_quota: this.formData.totalKg,
         remaining_kg_quota: this.editingAccounting
-          ? this.formData.totalKg - (this.outputDetail.totalKg - this.outputDetail.remainingKg)
+          ? this.formData.totalKg - (this.originalData.totalKg - this.originalData.remainingKg)
           : this.formData.totalKg,
         total_paid_amount: this.formData.purchasedAmount,
         payment_type: this.formData.paymentType,
@@ -714,6 +710,21 @@ export default {
       }
 
       try {
+        if (!this.editingAccounting) {
+          // Mükerrer kayıt kontrolü
+          const { data: existing } = await supabase
+            .from('customer_balances')
+            .select('id')
+            .eq('customer_id', payload.customer_id)
+            .eq('season_id', payload.season_id)
+            .maybeSingle()
+
+          if (existing) {
+            this.$message.error('Bu müşteri için bu sezonda zaten bir cari bakiye tanımlanmış!')
+            return
+          }
+        }
+
         if (this.editingAccounting) {
           const { error } = await supabase
             .from('customer_balances')
