@@ -1,0 +1,29 @@
+name: Supabase Günlük Yedekleme
+
+on:
+  schedule:
+    # Her gün gece 21:00'de çalışır (UTC)
+    - cron: '0 21 * * *'
+  workflow_dispatch: # Manuel tetiklemek istersen
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install PostgreSQL Tools
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Backup Database
+        run: |
+          pg_dump "${{ secrets.SUPABASE_DB_URL }}" > backup_$(date +%Y-%m-%d).sql
+
+      - name: Upload to Google Drive
+        uses: adityak74/google-drive-upload-git-action@main
+        with:
+          credentials: ${{ secrets.GDRIVE_JSON_KEY }}
+          filename: backup_$(date +%Y-%m-%d).sql
+          folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
+          overwrite: "false"

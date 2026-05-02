@@ -42,68 +42,38 @@
       border
       style="width: 100%"
       empty-text="Üretim partisi bulunamadı"
+      row-key="id"
       show-summary
       :summary-method="getSummary"
     >
       <el-table-column type="expand">
-        <template v-slot="scope">
-          <div class="sub-detail">
-            <div class="sub-detail__header">
-              <h4>Ham Peynir Girişleri</h4>
-            </div>
-            <el-table
-              :data="scope.row.inputs"
-              border
-              size="small"
-              empty-text="Henüz alım yok"
-              style="width: 100%"
-            >
-              <el-table-column prop="vendorName" label="Tedarikçi" width="170"></el-table-column>
-              <el-table-column prop="receivedAt" label="Alım Tarihi" width="130">
-                <template v-slot="s">{{ s.row.receivedAt | formatDate }}</template>
+        <template v-slot="props">
+          <div style="padding: 10px 20px; background-color: #f9fafc">
+            <h4 style="margin-top: 0; margin-bottom: 10px">Hammadde Alım Detayları</h4>
+            <el-table :data="[props.row]" border size="small" style="width: 60%">
+              <el-table-column label="Toplam Alınan (KG)" align="center">
+                <template v-slot="s">{{ s.row.totalInputKG | formatNumber }}</template>
               </el-table-column>
-              <el-table-column prop="inputWeight" label="Alınan KG" width="110">
-                <template v-slot="s">{{ s.row.inputWeight | formatNumber }}</template>
-              </el-table-column>
-              <el-table-column prop="unitPrice" label="Birim Fiyat" width="110">
-                <template v-slot="s">{{ s.row.unitPrice | formatNumber }} ₺</template>
-              </el-table-column>
-              <el-table-column prop="totalCost" label="Toplam Tutar" width="120">
+              <el-table-column label="Toplam Alım Tutarı (₺)" align="center">
                 <template v-slot="s">{{ s.row.totalCost | formatNumber }} ₺</template>
               </el-table-column>
-              <el-table-column prop="paidAmount" label="Ödenen" width="110">
-                <template v-slot="s">{{ s.row.paidAmount | formatNumber }} ₺</template>
-              </el-table-column>
-              <el-table-column label="Kalan" width="110">
+              <el-table-column label="Ortalama Birim Fiyat (₺/kg)" align="center">
                 <template v-slot="s">
-                  <el-tag
-                    :type="s.row.totalCost - s.row.paidAmount > 0 ? 'danger' : 'success'"
-                    size="mini"
-                    effect="plain"
-                  >
-                    {{ (s.row.totalCost - s.row.paidAmount) | formatNumber }} ₺
-                  </el-tag>
+                  {{
+                    s.row.totalInputKG > 0 ? s.row.totalCost / s.row.totalInputKG : 0 | formatNumber
+                  }}
+                  ₺
                 </template>
               </el-table-column>
-              <el-table-column prop="paymentType" label="Ödeme Türü" width="120"></el-table-column>
-              <el-table-column prop="notes" label="Not">
-                <template v-slot="s">{{ s.row.notes }}</template>
-              </el-table-column>
-              <el-table-column label="İşlem" width="90" fixed="right">
+              <el-table-column label="İşlem" align="center" width="80">
                 <template v-slot="s">
                   <el-button
                     type="primary"
+                    circle
+                    size="mini"
                     icon="el-icon-edit"
-                    circle
-                    size="mini"
-                    @click="openInputDialog(scope.row, s.row)"
-                  ></el-button>
-                  <el-button
-                    type="danger"
-                    icon="el-icon-delete"
-                    circle
-                    size="mini"
-                    @click="deleteInput(scope.row, s.row)"
+                    :disabled="s.row.isCompleted"
+                    @click="openInputDialog(s.row)"
                   ></el-button>
                 </template>
               </el-table-column>
@@ -111,21 +81,10 @@
           </div>
         </template>
       </el-table-column>
+
       <el-table-column prop="batchName" sortable label="Parti Adı" min-width="60"></el-table-column>
-      <el-table-column prop="createdAt" sortable label="Oluş. Tarihi" width="126">
+      <el-table-column prop="createdAt" sortable label="Oluşturma Tarihi" width="170">
         <template v-slot="scope">{{ scope.row.createdAt | formatDate }}</template>
-      </el-table-column>
-      <el-table-column prop="totalInputKG" sortable label="Alınan(kg)">
-        <template v-slot="scope">{{ scope.row.totalInputKG | formatNumber }}</template>
-      </el-table-column>
-      <el-table-column prop="unitCostPerKg" sortable label="Birim Fiyat">
-        <template v-slot="scope"
-          >{{ scope.row.unitCostPerKg | formatNumber }}
-          {{ scope.row.unitCostPerKg ? '₺' : '-' }}</template
-        >
-      </el-table-column>
-      <el-table-column prop="totalCost" sortable label="Maliyet(₺)">
-        <template v-slot="scope">{{ scope.row.totalCost | formatNumber }} ₺</template>
       </el-table-column>
       <el-table-column prop="totalOutputKG" sortable label="Üretilen(kg)" width="135">
         <template v-slot="scope">
@@ -165,14 +124,16 @@
               icon="el-icon-edit"
               @click="editBatch(scope.row)"
             ></el-button>
-            <el-button
-              type="success"
-              size="small"
-              circle
-              icon="el-icon-plus"
-              :disabled="scope.row.isCompleted"
-              @click="openInputDialog(scope.row)"
-            ></el-button>
+            <el-tooltip effect="dark" content="Maliyet & Toplam KG Gir" placement="top-start">
+              <el-button
+                type="success"
+                size="small"
+                circle
+                icon="el-icon-plus"
+                :disabled="scope.row.isCompleted"
+                @click="openInputDialog(scope.row)"
+              ></el-button>
+            </el-tooltip>
             <el-tooltip effect="dark" content="Üretim Çıktıları" placement="top-start">
               <el-button
                 type="primary"
@@ -238,104 +199,35 @@
       </span>
     </el-dialog>
 
-    <!-- Dialog 2: Hammadde Alım -->
+    <!-- Dialog 2: Hammadde/Maliyet Giriş -->
     <el-dialog
-      :title="
-        inputForm.id
-          ? `Alımı Düzenle — ${selectedBatch ? selectedBatch.batchName : ''}`
-          : `Yeni Alım Ekle — ${selectedBatch ? selectedBatch.batchName : ''}`
-      "
+      :title="`${selectedBatch ? selectedBatch.batchName : ''} - Maliyet ve KG Girişi`"
       :visible.sync="inputDialogVisible"
-      width="35%"
+      width="30%"
       @close="resetInputForm"
     >
-      <el-form label-position="top" :model="inputForm" ref="inputFormRef" :rules="inputRules">
+      <el-form label-position="top" :model="inputForm" ref="inputFormRef">
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="Tedarikçi" prop="vendorId">
-              <el-select
-                v-model="inputForm.vendorId"
-                filterable
-                placeholder="Tedarikçi seçin"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="item in vendorList"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                ></el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="Alım Tarihi" prop="receivedAt">
-              <el-date-picker
-                v-model="inputForm.receivedAt"
-                type="date"
-                format="dd.MM.yyyy"
-                placeholder=""
-                style="width: 100%"
-              ></el-date-picker>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="16">
-          <el-col :span="8">
-            <el-form-item label="Alınan KG" prop="inputWeight">
+            <el-form-item label="Toplam Alınan KG" prop="totalInputKg">
               <el-input-number
-                v-model="inputForm.inputWeight"
-                @change="calcTotal"
+                v-model="inputForm.totalInputKg"
                 style="width: 100%"
                 :precision="2"
+                :min="0"
               ></el-input-number>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
-            <el-form-item label="Birim Fiyat (₺/kg)" prop="unitPrice">
-              <price-input v-model="inputForm.unitPrice" @input="calcTotal" :decimals="2" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="Toplam Tutar (₺)" prop="totalPurchaseAmount">
-              <price-input v-model="inputForm.totalPurchaseAmount" disabled :decimals="2" />
+          <el-col :span="12">
+            <el-form-item label="Toplam Maliyet (₺)" prop="totalCost">
+              <price-input v-model="inputForm.totalCost" :decimals="2" />
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="Ödeme Türü" prop="paymentType">
-              <el-select v-model="inputForm.paymentType" style="width: 100%">
-                <el-option v-for="t in paymentTypes" :key="t" :label="t" :value="t"></el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="Ödenen Miktar (₺)" prop="paidAmount">
-              <price-input v-model="inputForm.paidAmount" :decimals="2" />
-              <div
-                v-if="inputForm.totalPurchaseAmount - inputForm.paidAmount > 0"
-                style="
-                  margin-top: 5px;
-                  color: #f56c6c;
-                  font-weight: bold;
-                  font-size: 14px;
-                  text-align: right;
-                "
-              >
-                Kalan Borç:
-                {{ (inputForm.totalPurchaseAmount - inputForm.paidAmount) | formatNumber }} ₺
-              </div>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="Not">
-          <el-input type="textarea" v-model="inputForm.notes"></el-input>
-        </el-form-item>
       </el-form>
       <span slot="footer">
         <el-button @click="inputDialogVisible = false">Vazgeç</el-button>
-        <el-button type="primary" @click="saveInput">Kaydet</el-button>
+        <el-button type="primary" @click="saveBatchInput">Kaydet</el-button>
       </span>
     </el-dialog>
 
@@ -481,7 +373,6 @@ export default {
   data() {
     return {
       productionList: [],
-      vendorList: [],
       seasonList: [],
       productTypes: [],
       manufactures: [],
@@ -500,25 +391,10 @@ export default {
         batchName: [{ required: true, message: 'Parti adı giriniz', trigger: 'blur' }],
         seasonId: [{ required: true, message: 'Sezon seçiniz', trigger: 'change' }]
       },
-      // Input form
+      // Input form (Batch Total)
       inputForm: {
-        id: null,
-        batchId: null,
-        vendorId: '',
-        receivedAt: '',
-        inputWeight: 0,
-        unitPrice: 0,
-        totalPurchaseAmount: 0,
-        paidAmount: 0,
-        paymentType: 'Nakit',
-        notes: ''
-      },
-      paymentTypes: ['Nakit', 'Havale/EFT', 'Kredi Kartı', 'Borç'],
-      inputRules: {
-        vendorId: [{ required: true, message: 'Tedarikçi seçiniz', trigger: 'change' }],
-        receivedAt: [{ required: true, message: 'Alım tarihi seçiniz', trigger: 'change' }],
-        inputWeight: [{ required: true, message: 'KG giriniz', trigger: 'blur' }],
-        totalPurchaseAmount: [{ required: true, message: 'Tutar giriniz', trigger: 'blur' }]
+        totalInputKg: 0,
+        totalCost: 0
       },
       // Output form
       outputForm: {
@@ -539,7 +415,7 @@ export default {
     try {
       await this.fetchAuxiliaryData()
       await this.fetchAllProductions()
-      
+
       // Önce mevcut yıla ait sezonu seç, yoksa listenin sonundakini seç
       if (this.defaultSeasonId) {
         this.filter.season = this.defaultSeasonId
@@ -608,20 +484,15 @@ export default {
   methods: {
     // === DATA FETCHING ===
     async fetchAuxiliaryData() {
-      const { data: vendors } = await supabase
-        .from('vendors')
-        .select('id, full_name')
-        .eq('tenant_id', this.currentTenantId)
-      this.vendorList = vendors?.map((v) => ({ label: v.full_name, value: v.id })) || []
       const { data: seasons } = await supabase
         .from('seasons')
         .select('id, name')
         .eq('tenant_id', this.currentTenantId)
       this.seasonList = seasons?.map((s) => ({ label: s.name, value: s.id })) || []
-      
+
       // Varsayılan sezonu bul (mevcut yılın sezonu)
       const currentYear = new Date().getFullYear().toString()
-      const defaultSeason = this.seasonList.find(s => s.label.includes(currentYear))
+      const defaultSeason = this.seasonList.find((s) => s.label.includes(currentYear))
       if (defaultSeason) {
         this.defaultSeasonId = defaultSeason.value
       }
@@ -639,18 +510,6 @@ export default {
           `
           *,
           season:seasons(name),
-          inputs:production_inputs(
-            id,
-            vendor_id,
-            received_at,
-            input_weight,
-            unit_price,
-            total_purchase_amount,
-            paid_amount,
-            payment_type,
-            notes,
-            vendor:vendors(full_name)
-          ),
           outputs:production_outputs(
             quantity,
             product:product_types(name, category, unit_weight, is_grassy)
@@ -667,8 +526,8 @@ export default {
         return
       }
       this.productionList = data.map((batch) => {
-        const totalInputKG = batch.inputs?.reduce((s, i) => s + (i.input_weight || 0), 0) || 0
-        const totalCost = batch.inputs?.reduce((s, i) => s + (i.total_purchase_amount || 0), 0) || 0
+        const totalInputKG = batch.total_input_kg || 0
+        const totalCost = batch.total_cost || 0
         const totalOutputKG =
           batch.outputs?.reduce(
             (s, o) => s + (o.quantity || 0) * (o.product?.unit_weight || 0),
@@ -693,19 +552,6 @@ export default {
               : 0,
           totalOutputKG,
           totalWasteKG: batch.is_completed ? totalInputKG - totalOutputKG : null,
-          inputs:
-            batch.inputs?.map((inp) => ({
-              id: inp.id,
-              vendorId: inp.vendor_id,
-              vendorName: inp.vendor?.full_name || '',
-              receivedAt: inp.received_at,
-              inputWeight: inp.input_weight,
-              unitPrice: inp.unit_price || 0,
-              totalCost: inp.total_purchase_amount || 0,
-              paidAmount: inp.paid_amount || 0,
-              paymentType: inp.payment_type || 'Nakit',
-              notes: inp.notes
-            })) || [],
           outputList:
             batch.outputs?.map((o) => ({
               type: o.product?.name || o.product?.category,
@@ -727,10 +573,10 @@ export default {
       this.batchDialogVisible = true
     },
     resetBatchForm() {
-      this.batchForm = { 
-        batchName: '', 
-        seasonId: this.defaultSeasonId || '', 
-        notes: '' 
+      this.batchForm = {
+        batchName: '',
+        seasonId: this.defaultSeasonId || '',
+        notes: ''
       }
       if (this.batchForm.seasonId) {
         this.updateAutoName(this.batchForm.seasonId)
@@ -773,124 +619,42 @@ export default {
     editBatch(batch) {
       this.openOutputDialog(batch, true)
     },
-    openInputDialog(batch, input = null) {
+    openInputDialog(batch) {
       this.selectedBatch = batch
-      if (input) {
-        this.inputForm = {
-          id: input.id,
-          batchId: batch.id,
-          vendorId: input.vendorId,
-          receivedAt: input.receivedAt,
-          inputWeight: input.inputWeight,
-          unitPrice: input.unitPrice,
-          totalPurchaseAmount: input.totalCost,
-          paidAmount: input.paidAmount,
-          paymentType: input.paymentType,
-          notes: input.notes
-        }
-      } else {
-        this.resetInputForm()
-        this.inputForm.batchId = batch.id
+      this.inputForm = {
+        totalInputKg: batch.totalInputKG || 0,
+        totalCost: batch.totalCost || 0
       }
       this.inputDialogVisible = true
-      this.$nextTick(() => {
-        if (this.$refs.batchTable) {
-          this.$refs.batchTable.toggleRowExpansion(batch, true)
-        }
-      })
     },
     resetInputForm() {
       this.inputForm = {
-        id: null,
-        batchId: null,
-        vendorId: '',
-        receivedAt: '',
-        inputWeight: 0,
-        unitPrice: 0,
-        totalPurchaseAmount: 0,
-        paidAmount: 0,
-        paymentType: 'Nakit',
-        notes: ''
+        totalInputKg: 0,
+        totalCost: 0
       }
     },
-    calcTotal() {
-      this.inputForm.totalPurchaseAmount = this.inputForm.inputWeight * this.inputForm.unitPrice
-      this.inputForm.paidAmount = this.inputForm.totalPurchaseAmount
-    },
-    async saveInput() {
-      this.$refs.inputFormRef.validate(async (valid) => {
-        if (!valid) return
-        try {
-          const payload = {
-            batch_id: this.inputForm.batchId,
-            vendor_id: this.inputForm.vendorId,
-            received_at: this.inputForm.receivedAt,
-            input_weight: this.inputForm.inputWeight,
-            unit_price: normalizeNumber(this.inputForm.unitPrice),
-            total_purchase_amount: normalizeNumber(this.inputForm.totalPurchaseAmount),
-            paid_amount: normalizeNumber(this.inputForm.paidAmount),
-            payment_type: this.inputForm.paymentType
-          }
-          if (this.inputForm.notes) payload.notes = this.inputForm.notes
-
-          if (this.inputForm.id) {
-            const { error } = await supabase
-              .from('production_inputs')
-              .update(payload)
-              .eq('id', this.inputForm.id)
-            if (error) throw error
-            this.$notify({
-              title: 'Başarılı',
-              type: 'success',
-              message: 'Alım güncellendi!',
-              duration: 3000,
-              position: 'top-right'
-            })
-          } else {
-            const { error } = await supabase.from('production_inputs').insert([payload])
-            if (error) throw error
-            this.$notify({
-              title: 'Başarılı',
-              type: 'success',
-              message: 'Yeni alım eklendi!',
-              duration: 3000,
-              position: 'top-right'
-            })
-          }
-          this.inputDialogVisible = false
-          await this.fetchAllProductions()
-        } catch (err) {
-          console.error(err)
-          this.$message.error('Alım kaydedilirken hata oluştu.')
-        }
-      })
-    },
-    async deleteInput(batch, input) {
+    async saveBatchInput() {
       try {
-        await this.$confirm(
-          `${input.vendorName} tedarikçisinden alınan ${input.inputWeight} KG alımı silmek istiyor musunuz?`,
-          'Alım Silme',
-          {
-            confirmButtonText: 'Evet, Sil',
-            cancelButtonText: 'İptal',
-            type: 'warning'
-          }
-        )
-        const { error } = await supabase.from('production_inputs').delete().eq('id', input.id)
+        const { error } = await supabase
+          .from('production_batches')
+          .update({
+            total_input_kg: this.inputForm.totalInputKg,
+            total_cost: normalizeNumber(this.inputForm.totalCost)
+          })
+          .eq('id', this.selectedBatch.id)
         if (error) throw error
         this.$notify({
           title: 'Başarılı',
           type: 'success',
-          message: 'Alım silindi!',
+          message: 'Parti maliyet ve KG bilgileri güncellendi!',
           duration: 3000,
           position: 'top-right'
         })
+        this.inputDialogVisible = false
         await this.fetchAllProductions()
-      } catch (e) {
-        if (e !== 'cancel') {
-          console.error(e)
-          this.$message.error('Silme sırasında hata oluştu.')
-        }
+      } catch (err) {
+        console.error(err)
+        this.$message.error('Bilgiler kaydedilirken hata oluştu.')
       }
     },
 
@@ -1012,6 +776,7 @@ export default {
       const data = this.filteredData
       const totalInputKG = data.reduce((s, r) => s + (r.totalInputKG || 0), 0)
       const totalCost = data.reduce((s, r) => s + (r.totalCost || 0), 0)
+      const totalOutputKG = data.reduce((s, r) => s + (r.totalOutputKG || 0), 0)
       const totalWasteKG = data
         .filter((r) => r.isCompleted && r.totalWasteKG !== null)
         .reduce((s, r) => s + r.totalWasteKG, 0)
@@ -1020,6 +785,7 @@ export default {
       const colMap = {
         totalInputKG: `${this.$options.filters.formatNumber(totalInputKG)} kg`,
         totalCost: `${this.$options.filters.formatNumber(totalCost)} ₺`,
+        totalOutputKG: `${this.$options.filters.formatNumber(totalOutputKG)} kg`,
         totalWasteKG: `${this.$options.filters.formatNumber(totalWasteKG)} kg`,
         unitCostPerKg:
           avgUnitCost > 0 ? `Ort: ${this.$options.filters.formatNumber(avgUnitCost)} ₺` : '-'
