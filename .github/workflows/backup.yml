@@ -2,16 +2,21 @@ name: Supabase Günlük Yedekleme
 
 on:
   schedule:
-    # Her gün gece 21:00'de çalışır (UTC)
+    # Her gün Türkiye saati ile 00:00'da (UTC 21:00) çalışır
     - cron: '0 21 * * *'
-  workflow_dispatch: # Manuel tetiklemek istersen
+  workflow_dispatch: # Manuel çalıştırmak için
 
 jobs:
   backup:
     runs-on: ubuntu-latest
+    # Node 24'e şimdiden geçmek için (Uyarıda belirtilen yöntem)
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        # v3 yerine v4 (veya en güncel sürüm) kullanıyoruz
+        uses: actions/checkout@v4
 
       - name: Install PostgreSQL Tools
         run: sudo apt-get install -y postgresql-client
@@ -21,6 +26,7 @@ jobs:
           pg_dump "${{ secrets.SUPABASE_DB_URL }}" > backup_$(date +%Y-%m-%d).sql
 
       - name: Upload to Google Drive
+        # Eğer bu action güncellenmemişse Node 24 force komutu işe yarayacaktır
         uses: adityak74/google-drive-upload-git-action@main
         with:
           credentials: ${{ secrets.GDRIVE_JSON_KEY }}
