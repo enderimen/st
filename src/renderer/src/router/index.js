@@ -35,6 +35,7 @@ const router = new Router({
         { path: 'tum-cariler', name: 'Accounting', component: Accounting },
         { path: 'tum-cari-islemleri', name: 'AccountingProcess', component: AccountingProcess },
         { path: 'tedarikciler', name: 'Vendors', component: Vendors },
+        { path: 'tedarikciler/:id', name: 'VendorDetail', component: () => import('../views/VendorDetail.vue') },
         { path: 'tum-sezonlar', name: 'Seasons', component: Seasons },
         { path: 'uretimler', name: 'Manufacture', component: Manufacture },
         { path: 'urunler', name: 'Products', component: Products },

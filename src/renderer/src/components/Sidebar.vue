@@ -25,6 +25,7 @@
       text-color="#fff"
       active-text-color="#ffd04b"
       :default-active="$route.path"
+      :default-openeds="['0']"
       router
     >
       <el-menu-item index="/anasayfa">

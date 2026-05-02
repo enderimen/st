@@ -114,7 +114,7 @@
               type="success"
               size="small"
               icon="el-icon-notebook-2"
-              @click="handleClick('Accounting', scope.row.id)"
+              @click="handleClick('Customers', scope.row.id)"
               >Cari İşlemlerini Gör</el-button
             >
           </el-tooltip>

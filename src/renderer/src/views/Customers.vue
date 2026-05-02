@@ -247,7 +247,7 @@
                   :min="formData.totalDelivered || 0"
                   controls-position="right"
                   style="width: 100%"
-                  :disabled="!editingCustomer || !formData.hasBalance"
+                  disabled
                   @change="updateRemainingQuota"
                 ></el-input-number>
               </el-form-item>
@@ -272,7 +272,7 @@
               <el-form-item label="Toplam Ödenen">
                 <price-input
                   v-model="formData.totalPaidAmount"
-                  :disabled="!editingCustomer || !formData.hasBalance"
+                  disabled
                 />
               </el-form-item>
             </el-col>
@@ -469,6 +469,7 @@ export default {
   },
   async mounted() {
     await this.getAllCustomer()
+    this.filter.seasonId = this.$route.params?.season || ''
 
     if (this.$route.params?.customerId) {
       const customer = this.customerList.find((c) => c.id === this.$route.params.customerId)
@@ -500,8 +501,12 @@ export default {
         )
       }
 
-      // 3. Alfabetik Sıralama
-      return filtered.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'tr'))
+      // 3. Sıralama: Perakende (Dükkan) olanlar her zaman en üstte, diğerleri A-Z
+      return filtered.sort((a, b) => {
+        if (a.isRetail && !b.isRetail) return -1
+        if (!a.isRetail && b.isRetail) return 1
+        return (a.fullName || '').localeCompare(b.fullName || '', 'tr')
+      })
     },
     isSaveDisabled() {
       const { phone, fullName, address } = this.formData

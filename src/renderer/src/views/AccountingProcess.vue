@@ -539,6 +539,7 @@ export default {
       originalData: {
         totalKg: 0,
         purchasedAmount: 0,
+        remainingKg: 0,
         plainTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0, kg10: 0, kg25: 0 },
         herbyTulum: { kg1: 0, kg2: 0, kg3: 0, kg5: 0 },
         plainSalamura: { kg2: 0, kg3: 0, kg5: 0 },
@@ -1437,10 +1438,19 @@ export default {
     'formData.balanceId': {
       deep: true,
       handler(newValue) {
-        // Düzenleme modundaysak izleyici veriyi ezmemeli
-        if (this.editingAccounting) return
+        // Düzenleme modundaysak veya yeni bir ID yoksa (sıfırlanmamışsa) izleyici veriyi ezmemeli
+        if (this.editingAccounting || !newValue) {
+          if (!newValue) {
+            this.formData.seasonName = ''
+            this.originalData.totalKg = 0
+            this.originalData.remainingKg = 0
+            this.formData.totalKg = 0
+            this.formData.remainingKg = 0
+          }
+          return
+        }
 
-        if (newValue && this.customerBalanceList.length > 0) {
+        if (this.customerBalanceList.length > 0) {
           const balance = this.customerBalanceList.find((b) => b.id === newValue)
           if (balance) {
             this.formData.seasonName = balance.season?.name || ''
@@ -1454,12 +1464,6 @@ export default {
               this.outputDetail.seasonId = balance.season_id
             }
           }
-        } else {
-          this.formData.seasonName = ''
-          this.originalData.totalKg = 0
-          this.originalData.remainingKg = 0
-          this.formData.totalKg = 0
-          this.formData.remainingKg = 0
         }
       }
     }

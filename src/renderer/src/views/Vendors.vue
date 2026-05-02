@@ -16,6 +16,7 @@
     </div>
     <el-table
       v-else
+      ref="vendorTable"
       :data="paginatedData"
       border
       show-summary
@@ -39,8 +40,17 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column fixed="right" label="İşlem" width="115">
+      <el-table-column fixed="right" label="İşlem" width="165">
         <template v-slot="scope">
+          <el-tooltip content="Tedarikçi Detayı / İşlemler" placement="top-start">
+            <el-button
+              type="success"
+              icon="el-icon-tickets"
+              circle
+              @click="$router.push(`/anasayfa/tedarikciler/${scope.row.id}`)"
+            ></el-button>
+          </el-tooltip>
+
           <el-tooltip content="Tedarikçiyi Düzenle" placement="top-start">
             <el-button
               type="primary"
@@ -72,36 +82,23 @@
       style="margin-top: 20px; text-align: center"
     />
 
-    <!-- Dialog -->
+    <!-- Dialog: Tedarikçi Ekle & Düzenle -->
     <el-dialog
       :title="editingVendor ? 'Tedarikçi Bilgilerini Düzenle' : 'Yeni Tedarikçi Oluştur'"
       :visible.sync="dialogVisible"
       width="30%"
     >
-      <el-form
-        label-position="top"
-        :model="formData"
-        :rules="rules"
-        ref="formRef"
-        label-width="100px"
-      >
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="Ad Soyad" prop="full_name">
-              <el-input v-model="formData.full_name"></el-input>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="Telefon" prop="phone">
-              <el-input
-                v-model="formData.phone"
-                placeholder="(555) 555 55 55"
-                @input="formatPhone"
-              ></el-input>
-            </el-form-item>
-          </el-col>
-        </el-row>
-
+      <el-form label-position="top" :model="formData" :rules="rules" ref="formRef">
+        <el-form-item label="Ad Soyad" prop="full_name">
+          <el-input v-model="formData.full_name"></el-input>
+        </el-form-item>
+        <el-form-item label="Telefon" prop="phone">
+          <el-input
+            v-model="formData.phone"
+            placeholder="(555) 555 55 55"
+            @input="formatPhone"
+          ></el-input>
+        </el-form-item>
         <el-form-item label="Adres" prop="address">
           <el-input
             type="textarea"
@@ -109,33 +106,7 @@
             v-model="formData.address"
           ></el-input>
         </el-form-item>
-
-        <el-divider v-if="editingVendor && formData.debt > 0">Borç Ödeme</el-divider>
-        <el-row v-if="editingVendor && formData.debt > 0" :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="Mevcut Borç">
-              <el-input :value="formatNumber(formData.debt) + ' ₺'" disabled></el-input>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="Ödeme Tutarı">
-              <price-input
-                v-model="formData.newPayment"
-                :max="formData.debt"
-                @input="onPaymentInput"
-              />
-              <el-checkbox
-                v-model="formData.isPayAll"
-                @change="handlePayAll"
-                style="margin-top: 5px; float: right"
-              >
-                Tümünü Öde
-              </el-checkbox>
-            </el-form-item>
-          </el-col>
-        </el-row>
       </el-form>
-
       <span slot="footer" class="dialog-footer">
         <el-button @click="dialogVisible = false">Vazgeç</el-button>
         <el-button type="primary" :disabled="isSaveDisabled" @click="saveVendor">Kaydet</el-button>
@@ -148,14 +119,10 @@
 import { supabase } from '../utils/supabase'
 import globalMixin from '../mixin/global.mixin.js'
 import { formatNumber } from '../utils/helpers'
-import PriceInput from '../components/PriceInput.vue'
 
 export default {
   name: 'Vendors',
   mixins: [globalMixin],
-  components: {
-    PriceInput
-  },
   data() {
     return {
       loading: false,
@@ -173,8 +140,7 @@ export default {
         phone: '',
         address: '',
         debt: 0,
-        newPayment: 0,
-        isPayAll: false
+        inputs: []
       },
       rules: {
         full_name: [{ required: true, message: 'Ad Soyad zorunlu', trigger: 'blur' }],
@@ -190,6 +156,7 @@ export default {
       }
     }
   },
+  filters: { formatNumber },
   async mounted() {
     await this.getAllVendor()
   },
@@ -223,8 +190,14 @@ export default {
           `
           *,
           production_inputs (
+            id,
+            received_at,
+            input_weight,
+            unit_price,
             total_purchase_amount,
-            paid_amount
+            paid_amount,
+            payment_type,
+            notes
           )
         `
         )
@@ -253,7 +226,7 @@ export default {
       const sums = []
       columns.forEach((column, index) => {
         if (index === 0) {
-          sums[index] = 'Toplam'
+          sums[index] = ''
           return
         }
         if (['total_purchase', 'total_paid', 'debt'].includes(column.property)) {
@@ -278,20 +251,7 @@ export default {
     formatNumber(val) {
       return formatNumber(val)
     },
-    handlePayAll(val) {
-      if (val) {
-        this.formData.newPayment = this.formData.debt
-      } else {
-        this.formData.newPayment = 0
-      }
-    },
-    onPaymentInput(val) {
-      if (val < this.formData.debt) {
-        this.formData.isPayAll = false
-      } else if (val === this.formData.debt) {
-        this.formData.isPayAll = true
-      }
-    },
+
     async addVendor(payload) {
       const { error } = await supabase.from('vendors').insert([
         {
@@ -316,52 +276,7 @@ export default {
       if (error) throw error
       await this.getAllVendor()
     },
-    async processVendorPayment(vendorId, paymentAmount) {
-      this.loading = true
-      try {
-        // 1. Bu tedarikçiye ait borçlu alımları (inputs) çekelim
-        const { data: inputs, error } = await supabase
-          .from('production_inputs')
-          .select('id, total_purchase_amount, paid_amount, received_at')
-          .eq('vendor_id', vendorId)
-          .order('received_at', { ascending: true })
 
-        if (error) throw error
-
-        let remainingPayment = paymentAmount
-        const updatePromises = []
-
-        // 2. Borcu olan kayıtları filtrele
-        const debtInputs =
-          inputs?.filter((i) => (i.total_purchase_amount || 0) > (i.paid_amount || 0)) || []
-
-        // 3. Ödemeyi FIFO (İlk giren ilk çıkar) mantığıyla dağıt
-        for (const input of debtInputs) {
-          if (remainingPayment <= 0) break
-
-          const currentDebt = (input.total_purchase_amount || 0) - (input.paid_amount || 0)
-          const paymentForThis = Math.min(remainingPayment, currentDebt)
-
-          updatePromises.push(
-            supabase
-              .from('production_inputs')
-              .update({ paid_amount: (input.paid_amount || 0) + paymentForThis })
-              .eq('id', input.id)
-          )
-
-          remainingPayment -= paymentForThis
-        }
-
-        if (updatePromises.length > 0) {
-          await Promise.all(updatePromises)
-        }
-      } catch (err) {
-        console.error('Payment error:', err)
-        throw err
-      } finally {
-        this.loading = false
-      }
-    },
     async deleteVendor(id) {
       const { error } = await supabase.from('vendors').delete().eq('id', id)
       if (error) throw error
@@ -374,19 +289,23 @@ export default {
       this.editingVendor = type === 'edit'
       if (vendor) {
         this.formData = {
-          ...vendor,
-          newPayment: 0,
-          isPayAll: false
+          ...vendor
         }
-        this.originalFormData = JSON.parse(JSON.stringify(this.formData))
+        this.originalFormData = JSON.parse(
+          JSON.stringify({
+            id: vendor.id,
+            full_name: vendor.full_name,
+            phone: vendor.phone,
+            address: vendor.address
+          })
+        )
       } else {
         this.formData = {
           full_name: '',
           phone: '',
           address: '',
           debt: 0,
-          newPayment: 0,
-          isPayAll: false
+          inputs: []
         }
         this.originalFormData = null
       }
@@ -398,18 +317,36 @@ export default {
 
         if (this.editingVendor) {
           try {
-            if (this.formData.newPayment > 0) {
-              await this.processVendorPayment(this.formData.id, this.formData.newPayment)
-            }
-            await this.updateVendor(this.formData)
+            await this.updateVendor({
+              id: this.formData.id,
+              full_name: this.formData.full_name,
+              phone: this.formData.phone,
+              address: this.formData.address
+            })
             this.$notify({
               title: 'Başarılı',
               type: 'success',
-              message: 'Tedarikçi bilgileri ve ödeme güncellendi!'
+              message: 'Tedarikçi bilgileri güncellendi!'
             })
+
+            // Eğer detay ekranındaysak güncel veriyi hemen forma yansıt
+            const updatedVendor = this.vendorList.find((v) => v.id === this.formData.id)
+            if (updatedVendor) {
+              this.formData.inputs = updatedVendor.inputs
+              this.originalFormData = JSON.parse(
+                JSON.stringify({
+                  id: updatedVendor.id,
+                  full_name: updatedVendor.full_name,
+                  phone: updatedVendor.phone,
+                  address: updatedVendor.address
+                })
+              )
+            }
           } catch (error) {
             this.$message.error('Tedarikçi güncellenirken hata oluştu.')
             console.error(error)
+          } finally {
+            this.dialogVisible = false
           }
         } else {
           try {
@@ -419,12 +356,14 @@ export default {
               type: 'success',
               message: 'Tedarikçi oluşturuldu!'
             })
+            this.dialogVisible = false
           } catch (error) {
             this.$message.error('Tedarikçi eklenirken hata oluştu.')
             console.error(error)
+          } finally {
+            this.dialogVisible = false
           }
         }
-        this.dialogVisible = false
       })
     },
     open(vendor) {
