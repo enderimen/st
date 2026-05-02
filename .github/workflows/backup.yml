@@ -23,13 +23,17 @@ jobs:
 
       - name: Backup Database
         run: |
+          # Şifreyi açıkça tanımlıyoruz
           export PGPASSWORD="${{ secrets.DB_PASSWORD }}"
 
-          pg_dump -h ipv4.db.rlhhlbnaecljcegabwak.supabase.co \
+          # Host kısmına panelden aldığınız '.pooler.supabase.com' ile biten adresi yazın
+          pg_dump -h aws-0-eu-central-1.pooler.supabase.com \
                   -U postgres \
                   -p 5432 \
                   -d postgres \
-                  --no-password > backup_$(date +%Y-%m-%d).sql
+                  --no-password \
+                  --no-owner \
+                  --no-privileges > backup_$(date +%Y-%m-%d).sql
 
       - name: Upload to Google Drive
         uses: adityak74/google-drive-upload-git-action@main
