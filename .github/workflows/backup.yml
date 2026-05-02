@@ -9,7 +9,7 @@ on:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    # Node 24'e şimdiden geçmek için (Uyarıda belirtilen yöntem)
+    # Node 24'e şimdiden geçmek için
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -23,11 +23,18 @@ jobs:
 
       - name: Backup Database
         run: |
-          # Hostname'in sonuna .pooler.supabase.com eklemek veya direct IPv4 kullanmak sorunu çözer.
-          pg_dump "${{ secrets.SUPABASE_DB_URL }}" > backup_$(date +%Y-%m-%d).sql
+          # 1. PostgreSQL şifresini ortam değişkeni olarak tanımladık
+          export PGPASSWORD="${{ secrets.DB_PASSWORD }}" 
+
+          # 2. pg_dump komutunu IPv4 zorlaması ve timeout ile çalıştır
+          pg_dump -h db.rlhhlbnaecljcegabwak.supabase.co \
+                  -U postgres \
+                  -p 5432 \
+                  -d postgres \
+                  --no-password \
+                  --verbose > backup_$(date +%Y-%m-%d).sql
 
       - name: Upload to Google Drive
-        # Eğer bu action güncellenmemişse Node 24 force komutu işe yarayacaktır
         uses: adityak74/google-drive-upload-git-action@main
         with:
           credentials: ${{ secrets.GDRIVE_JSON_KEY }}
