@@ -23,6 +23,7 @@ jobs:
 
       - name: Backup Database
         run: |
+          # Hostname'in sonuna .pooler.supabase.com eklemek veya direct IPv4 kullanmak sorunu çözer.
           pg_dump "${{ secrets.SUPABASE_DB_URL }}" > backup_$(date +%Y-%m-%d).sql
 
       - name: Upload to Google Drive
