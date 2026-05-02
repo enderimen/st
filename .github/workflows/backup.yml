@@ -23,16 +23,13 @@ jobs:
 
       - name: Backup Database
         run: |
-          # 1. PostgreSQL şifresini ortam değişkeni olarak tanımladık
-          export PGPASSWORD="${{ secrets.DB_PASSWORD }}" 
+          export PGPASSWORD="${{ secrets.DB_PASSWORD }}"
 
-          # 2. pg_dump komutunu IPv4 zorlaması ve timeout ile çalıştır
-          pg_dump -h db.rlhhlbnaecljcegabwak.supabase.co \
+          pg_dump -h ipv4.db.rlhhlbnaecljcegabwak.supabase.co \
                   -U postgres \
                   -p 5432 \
                   -d postgres \
-                  --no-password \
-                  --verbose > backup_$(date +%Y-%m-%d).sql
+                  --no-password > backup_$(date +%Y-%m-%d).sql
 
       - name: Upload to Google Drive
         uses: adityak74/google-drive-upload-git-action@main
