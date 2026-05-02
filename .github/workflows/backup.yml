@@ -23,12 +23,13 @@ jobs:
 
       - name: Backup Database
         run: |
-          # Şifreyi açıkça tanımlıyoruz
+          # Şifreni Secret'tan alıyoruz
           export PGPASSWORD="${{ secrets.DB_PASSWORD }}"
 
-          # Host kısmına panelden aldığınız '.pooler.supabase.com' ile biten adresi yazın
+          # Host: Pooler adresi
+          # User: postgres.[PROJE_ID] (Bu kısım kritik!)
           pg_dump -h aws-0-eu-central-1.pooler.supabase.com \
-                  -U postgres \
+                  -U postgres.rlhhlbnaecljcegabwak \
                   -p 5432 \
                   -d postgres \
                   --no-password \
