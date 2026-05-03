@@ -36,19 +36,22 @@ jobs:
 
       - name: Upload to Google Drive via Rclone
         run: |
-          # 1. Servis hesabı JSON anahtarını oluştur
           echo "${{ secrets.GDRIVE_JSON_KEY }}" | base64 -d > credentials.json
           
-          # 2. Rclone ayarlarını oluştur
-          # 'team_drive' parametresi kota sorununu aşmamızı sağlar
+          # 1. Config dosyasını güncelliyoruz
           cat <<EOF > rclone.conf
           [gdrive]
           type = drive
           scope = drive
           service_account_file = credentials.json
           root_folder_id = ${{ secrets.GDRIVE_FOLDER_ID }}
+          # Kota hatasını aşmak için kritik parametre:
+          server_side_across_configs = true
           EOF
           
-          # 3. Dosyayı yükle (Copy komutu varsa üzerine yazar)
-          # --drive-acknowledge-abuse: Güvenlik taraması uyarısını geçer
-          rclone --config rclone.conf copy backup_file.sql gdrive: --drive-acknowledge-abuse
+          # 2. Yükleme komutunu zorluyoruz
+          # --drive-upload-cutoff 0: Parçalı yüklemeyi kapatıp doğrudan yükleme yapar (Kota hatasını genellikle böyle aşarız)
+          rclone --config rclone.conf copy backup_file.sql gdrive: \
+                 --drive-upload-cutoff 0 \
+                 --drive-acknowledge-abuse \
+                 -v
