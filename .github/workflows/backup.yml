@@ -46,10 +46,11 @@ jobs:
                   --no-privileges > backup_file.sql
 
       - name: Upload to Google Drive
-        uses: adityak74/google-drive-upload-git-action@main
+        uses: Jotas-S/google-drive-upload@v1.1.0
         with:
           credentials: ${{ secrets.GDRIVE_JSON_KEY }}
           filename: backup_file.sql
           folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
-          overwrite: "true"
-          useCompleteSourceFilenameAsName: "true"
+          overwrite: true
+          # Bu parametre kota sorununu aşmak için kritiktir
+          supportsAllDrives: true
