@@ -46,7 +46,7 @@ jobs:
                   --no-privileges > backup_file.sql
 
       - name: Upload to Google Drive
-        uses: Jotas-S/google-drive-upload@v1.1.0
+        uses: adityak74/google-drive-upload-git-action@main
         with:
           credentials: ${{ secrets.GDRIVE_JSON_KEY }}
           filename: backup_file.sql
