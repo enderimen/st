@@ -51,4 +51,4 @@ jobs:
           credentials: ${{ secrets.GDRIVE_JSON_KEY }}
           filename: backup_file.sql
           folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
-          overwrite: "false"
+          overwrite: "true"
