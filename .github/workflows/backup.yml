@@ -52,3 +52,4 @@ jobs:
           filename: backup_file.sql
           folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
           overwrite: "true"
+          useCompleteSourceFilenameAsName: "true"
