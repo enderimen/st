@@ -21,23 +21,30 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
 
+      - name: Set Timestamp
+        id: timestamp
+        # Türkiye saatiyle daha uyumlu olması için UTC+3 veya doğrudan o anki zamanı çeker.
+        # Format: YYYY-MM-DD_HH-MM-SS (Örn: 2026-05-03_21-00-00)
+        run: echo "NOW=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
+
       - name: Backup Database
         run: |
           export PGPASSWORD="${{ secrets.DB_PASSWORD }}"
-          # Supabase bağlantı bilgileriniz
+          
+          # Dosya adını dinamik olarak belirliyoruz
           pg_dump -h aws-1-eu-central-1.pooler.supabase.com \
                   -U postgres.rlhhlbnaecljcegabwak \
                   -p 5432 \
                   -d postgres \
                   --no-password \
                   --no-owner \
-                  --no-privileges > backup_file.sql
+                  --no-privileges > backup_${{ env.NOW }}.sql
 
       - name: Upload Backup as Artifact
         uses: actions/upload-artifact@v4
         with:
-          # Her yedeğe tarih ve çalışma ID'si ekleyerek karışıklığı önleriz
-          name: supabase-backup-${{ github.run_id }}
-          path: backup_file.sql
-          # Yedeklerin kaç gün saklanacağını belirler (Max 90 gün)
-          retention-days: 89
+          # İndirilecek zip dosyasının adı
+          name: supabase-backup-${{ env.NOW }}
+          # Yüklenecek olan sql dosyasının tam adı
+          path: backup_${{ env.NOW }}.sql
+          retention-days: 30
