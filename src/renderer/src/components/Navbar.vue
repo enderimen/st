@@ -24,7 +24,7 @@
     </div>
     <div class="profile-section">
       <p>
-        Hoş geldin, <span>{{ userFullName }}!</span>
+        Hoş geldin, <span>{{ localUserFullName }}!</span>
       </p>
       <el-dropdown class="profile-dropdown" @command="open">
         <span class="el-dropdown-link">
@@ -56,8 +56,14 @@ export default {
       form: {
         search: ''
       },
-      dialogVisible: false
+      dialogVisible: false,
+      localUserFullName: localStorage.getItem('user_full_name') || ''
     }
+  },
+  mounted() {
+    window.addEventListener('profile-updated', () => {
+      this.localUserFullName = localStorage.getItem('user_full_name') || ''
+    })
   },
   computed: {
     getSearchResult() {

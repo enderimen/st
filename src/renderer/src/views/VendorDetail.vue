@@ -170,6 +170,13 @@
                 Kalan Borç:
                 {{ (inputForm.totalPurchaseAmount - inputForm.paidAmount) | formatNumber }} ₺
               </div>
+              <div
+                v-if="inputForm.id && (inputForm.totalPurchaseAmount - inputForm.paidAmount) > 0"
+                style="margin-top: 15px;"
+              >
+                <div style="font-size: 14px; margin-bottom: 5px;">Ödenecek Tutar (₺)</div>
+                <price-input v-model="inputForm.additionalPayment" :decimals="2" />
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -298,6 +305,7 @@ export default {
           unitPrice: input.unit_price,
           totalPurchaseAmount: input.total_purchase_amount,
           paidAmount: input.paid_amount,
+          additionalPayment: 0,
           paymentType: input.payment_type,
           notes: input.notes
         }
@@ -315,6 +323,7 @@ export default {
         unitPrice: 0,
         totalPurchaseAmount: 0,
         paidAmount: 0,
+        additionalPayment: 0,
         paymentType: 'Nakit',
         notes: ''
       }
@@ -333,7 +342,7 @@ export default {
             input_weight: this.inputForm.inputWeight,
             unit_price: normalizeNumber(this.inputForm.unitPrice),
             total_purchase_amount: normalizeNumber(this.inputForm.totalPurchaseAmount),
-            paid_amount: normalizeNumber(this.inputForm.paidAmount),
+            paid_amount: normalizeNumber(this.inputForm.paidAmount) + normalizeNumber(this.inputForm.additionalPayment || 0),
             payment_type: this.inputForm.paymentType
           }
           // Remove batch_id logic here

@@ -121,6 +121,7 @@ export default {
         if (error) throw error
 
         localStorage.setItem('user_full_name', this.profile.full_name)
+        window.dispatchEvent(new Event('profile-updated'))
 
         this.$message.success('Profil bilgileri başarıyla güncellendi!')
       } catch (err) {
