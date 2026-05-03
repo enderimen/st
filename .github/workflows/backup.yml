@@ -21,7 +21,14 @@ jobs:
 
       - name: Backup Database
         run: |
-          pg_dump "postgres://postgres.rlhhlbnaecljcegabwak:${{ secrets.DB_PASSWORD }}@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require" \
+          # Şifre (Sadece şifreyi içeren Secret)
+          export PGPASSWORD="${{ secrets.DB_PASSWORD }}"
+
+          # Host kısmını tam olarak panelin verdiği 'aws-1-...' ile değiştirdik
+          pg_dump -h aws-1-eu-central-1.pooler.supabase.com \
+                  -U postgres.rlhhlbnaecljcegabwak \
+                  -p 5432 \
+                  -d postgres \
                   --no-password \
                   --no-owner \
                   --no-privileges > backup_file.sql
