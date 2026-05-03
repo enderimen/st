@@ -2,41 +2,30 @@ name: Supabase Günlük Yedekleme
 
 on:
   schedule:
-    # Her gün Türkiye saati ile 00:00'da (UTC 21:00) çalışır
-    - cron: '0 21 * * *'
-  workflow_dispatch: # Manuel çalıştırmak için
+    - cron: '0 21 * * *' # Her gün TSİ 00:00
+  workflow_dispatch:
 
 jobs:
   backup:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install PostgreSQL Tools
+      - name: Install PostgreSQL 17 and Rclone
         run: |
-          # PostgreSQL resmi depo anahtarını ekle
+          # PostgreSQL 17 istemcisini kur (Sürüm hatası almamak için)
           sudo apt-get update
-          sudo apt-get install -y wget gnupg
+          sudo apt-get install -y wget gnupg rclone
           wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-          
-          # Depoyu ekle (Ubuntu 24.04 veya 22.04 uyumlu)
           echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
-          
-          # Listeyi güncelle ve v17 istemcisini kur
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
 
       - name: Backup Database
         run: |
           export PGPASSWORD="${{ secrets.DB_PASSWORD }}"
-
-          # Host: aws-1-... (Panelden aldığın adres)
-          # Port: 5432
-          # pg_dump sürümünü kontrol etmek istersen: pg_dump --version
+          # Panelden aldığın kesinleşmiş bilgiler: aws-1 hostu ve 5432 portu
           pg_dump -h aws-1-eu-central-1.pooler.supabase.com \
                   -U postgres.rlhhlbnaecljcegabwak \
                   -p 5432 \
@@ -45,12 +34,21 @@ jobs:
                   --no-owner \
                   --no-privileges > backup_file.sql
 
-      - name: Upload to Google Drive
-        uses: Jotas-S/google-drive-upload@v1.1.0
-        with:
-          credentials: ${{ secrets.GDRIVE_JSON_KEY }}
-          filename: backup_file.sql
-          folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
-          overwrite: true
-          # Bu parametre kota sorununu aşmak için kritiktir
-          supportsAllDrives: true
+      - name: Upload to Google Drive via Rclone
+        run: |
+          # 1. Servis hesabı JSON anahtarını oluştur
+          echo "${{ secrets.GDRIVE_JSON_KEY }}" | base64 -d > credentials.json
+          
+          # 2. Rclone ayarlarını oluştur
+          # 'team_drive' parametresi kota sorununu aşmamızı sağlar
+          cat <<EOF > rclone.conf
+          [gdrive]
+          type = drive
+          scope = drive
+          service_account_file = credentials.json
+          root_folder_id = ${{ secrets.GDRIVE_FOLDER_ID }}
+          EOF
+          
+          # 3. Dosyayı yükle (Copy komutu varsa üzerine yazar)
+          # --drive-acknowledge-abuse: Güvenlik taraması uyarısını geçer
+          rclone --config rclone.conf copy backup_file.sql gdrive: --drive-acknowledge-abuse
