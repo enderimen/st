@@ -9,13 +9,11 @@ on:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    # Node 24'e şimdiden geçmek için
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout Code
-        # v3 yerine v4 (veya en güncel sürüm) kullanıyoruz
         uses: actions/checkout@v4
 
       - name: Install PostgreSQL Tools
@@ -23,23 +21,20 @@ jobs:
 
       - name: Backup Database
         run: |
-          # Şifreni Secret'tan alıyoruz
           export PGPASSWORD="${{ secrets.DB_PASSWORD }}"
 
-          # Host: Pooler adresi
-          # User: postgres.[PROJE_ID] (Bu kısım kritik!)
           pg_dump -h aws-0-eu-central-1.pooler.supabase.com \
                   -U postgres.rlhhlbnaecljcegabwak \
-                  -p 5432 \
+                  -p 6543 \
                   -d postgres \
                   --no-password \
                   --no-owner \
-                  --no-privileges > backup_$(date +%Y-%m-%d).sql
+                  --no-privileges > backup_file.sql
 
       - name: Upload to Google Drive
         uses: adityak74/google-drive-upload-git-action@main
         with:
           credentials: ${{ secrets.GDRIVE_JSON_KEY }}
-          filename: backup_$(date +%Y-%m-%d).sql
+          filename: backup_file.sql
           folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
           overwrite: "false"
