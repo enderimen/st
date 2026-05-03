@@ -17,14 +17,26 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install PostgreSQL Tools
-        run: sudo apt-get install -y postgresql-client
+        run: |
+          # PostgreSQL resmi depo anahtarını ekle
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          
+          # Depoyu ekle (Ubuntu 24.04 veya 22.04 uyumlu)
+          echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          
+          # Listeyi güncelle ve v17 istemcisini kur
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
 
       - name: Backup Database
         run: |
-          # Şifre (Sadece şifreyi içeren Secret)
           export PGPASSWORD="${{ secrets.DB_PASSWORD }}"
 
-          # Host kısmını tam olarak panelin verdiği 'aws-1-...' ile değiştirdik
+          # Host: aws-1-... (Panelden aldığın adres)
+          # Port: 5432
+          # pg_dump sürümünü kontrol etmek istersen: pg_dump --version
           pg_dump -h aws-1-eu-central-1.pooler.supabase.com \
                   -U postgres.rlhhlbnaecljcegabwak \
                   -p 5432 \
