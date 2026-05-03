@@ -2,8 +2,8 @@ name: Supabase Günlük Yedekleme
 
 on:
   schedule:
-    - cron: '0 21 * * *' # Her gün TSİ 00:00
-  workflow_dispatch:
+    - cron: '0 21 * * *' # Her gün TSİ 00:00 (UTC 21:00)
+  workflow_dispatch: # Manuel tetikleme için
 
 jobs:
   backup:
@@ -12,11 +12,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install PostgreSQL 17 and Rclone
+      - name: Install PostgreSQL 17
         run: |
-          # PostgreSQL 17 istemcisini kur (Sürüm hatası almamak için)
           sudo apt-get update
-          sudo apt-get install -y wget gnupg rclone
+          sudo apt-get install -y wget gnupg
           wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
           echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
@@ -25,7 +24,7 @@ jobs:
       - name: Backup Database
         run: |
           export PGPASSWORD="${{ secrets.DB_PASSWORD }}"
-          # Panelden aldığın kesinleşmiş bilgiler: aws-1 hostu ve 5432 portu
+          # Supabase bağlantı bilgileriniz
           pg_dump -h aws-1-eu-central-1.pooler.supabase.com \
                   -U postgres.rlhhlbnaecljcegabwak \
                   -p 5432 \
@@ -34,24 +33,11 @@ jobs:
                   --no-owner \
                   --no-privileges > backup_file.sql
 
-      - name: Upload to Google Drive via Rclone
-        run: |
-          echo "${{ secrets.GDRIVE_JSON_KEY }}" | base64 -d > credentials.json
-          
-          # 1. Config dosyasını güncelliyoruz
-          cat <<EOF > rclone.conf
-          [gdrive]
-          type = drive
-          scope = drive
-          service_account_file = credentials.json
-          root_folder_id = ${{ secrets.GDRIVE_FOLDER_ID }}
-          # Kota hatasını aşmak için kritik parametre:
-          server_side_across_configs = true
-          EOF
-          
-          # 2. Yükleme komutunu zorluyoruz
-          # --drive-upload-cutoff 0: Parçalı yüklemeyi kapatıp doğrudan yükleme yapar (Kota hatasını genellikle böyle aşarız)
-          rclone --config rclone.conf copy backup_file.sql gdrive: \
-                 --drive-upload-cutoff 0 \
-                 --drive-acknowledge-abuse \
-                 -v
+      - name: Upload Backup as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # Her yedeğe tarih ve çalışma ID'si ekleyerek karışıklığı önleriz
+          name: supabase-backup-${{ github.run_id }}
+          path: backup_file.sql
+          # Yedeklerin kaç gün saklanacağını belirler (Max 90 gün)
+          retention-days: 89
