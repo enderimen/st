@@ -64,13 +64,13 @@
       style="width: 100%"
     >
       <!-- <el-table-column prop="id" label="ID" width="180"> </el-table-column> -->
-      <el-table-column prop="name" label="Sezon İsmi" sortable></el-table-column>
-      <el-table-column prop="totalInputWeight" label="Alınan(kg)" sortable>
+      <el-table-column prop="name" label="Sezon" sortable></el-table-column>
+      <el-table-column prop="totalInputWeight" label="Alınan Ham(kg)" sortable>
         <template v-slot="scope">
           {{ scope.row.totalInputWeight | formatNumber }}
         </template>
       </el-table-column>
-      <el-table-column prop="totalOutputWeight" label="Üretilen(kg)" sortable>
+      <el-table-column prop="totalOutputWeight" label="Net Üretilen(kg)" sortable>
         <template v-slot="scope">
           {{ scope.row.totalOutputWeight | formatNumber }}
         </template>
@@ -88,7 +88,7 @@
           {{ scope.row.createdDate | formatDateWithClock }}
         </template>
       </el-table-column>
-      <el-table-column fixed="right" label="İşlem" width="308">
+      <el-table-column fixed="right" label="İşlem" width="145">
         <template v-slot="scope">
           <el-tooltip
             class="item"
@@ -102,20 +102,6 @@
               icon="el-icon-notebook-2"
               @click="handleClick('Manufacture', scope.row.id)"
               >Üretimleri Gör</el-button
-            >
-          </el-tooltip>
-          <el-tooltip
-            class="item"
-            effect="dark"
-            :content="`${scope.row.name.split(' ')[0]} Cari İşlemlerini Gör`"
-            placement="top-start"
-          >
-            <el-button
-              type="success"
-              size="small"
-              icon="el-icon-notebook-2"
-              @click="handleClick('Customers', scope.row.id)"
-              >Cari İşlemlerini Gör</el-button
             >
           </el-tooltip>
         </template>
@@ -657,14 +643,11 @@ export default {
       // 5. İşlenmemiş Ürün (Devam Edenler)
       const { data: pending } = await supabase
         .from('production_batches')
-        .select('inputs:production_inputs(input_weight)')
+        .select('total_input_kg')
         .eq('is_completed', false)
         .eq('tenant_id', this.currentTenantId)
       this.summaryData.unprocessedKg =
-        pending?.reduce((s, b) => {
-          const batchInput = b.inputs?.reduce((is, i) => is + (i.input_weight || 0), 0) || 0
-          return s + batchInput
-        }, 0) || 0
+        pending?.reduce((s, b) => s + (b.total_input_kg || 0), 0) || 0
 
       // 6. Toplam Fire
       const { data: batches } = await supabase
@@ -739,8 +722,7 @@ export default {
           `
         id, name, created_at,
         batches:production_batches(
-          output_weight, waste_weight, is_completed,
-          inputs:production_inputs(input_weight, total_purchase_amount)
+          output_weight, waste_weight, is_completed, total_input_kg, total_cost
         )
       `
         )
@@ -755,11 +737,9 @@ export default {
           let totalCost = 0
 
           s.batches?.forEach((b) => {
-            const bInput = b.inputs?.reduce((sum, i) => sum + (i.input_weight || 0), 0) || 0
-            const bCost = b.inputs?.reduce((sum, i) => sum + (i.total_purchase_amount || 0), 0) || 0
-            totalInput += bInput
-            totalCost += bCost
             if (b.is_completed) {
+              totalInput += b.total_input_kg || 0
+              totalCost += b.total_cost || 0
               totalOutput += b.output_weight || 0
               totalLoss += b.waste_weight || 0
             }

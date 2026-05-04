@@ -100,6 +100,14 @@
           <el-tag v-else type="info" effect="dark" size="small">-</el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="Parti Birim Maliyeti(₺/kg)" align="center">
+        <template v-slot="scope">
+          <span v-if="scope.row.isCompleted && scope.row.totalOutputKG > 0">
+            {{ (scope.row.totalCost / scope.row.totalOutputKG) | formatNumber }} ₺
+          </span>
+          <el-tag v-else type="info" effect="dark" size="small">-</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="status" sortable label="Durum" width="126">
         <template v-slot="scope">
           <el-tag :type="scope.row.isCompleted ? 'success' : 'warning'" effect="dark">{{
@@ -351,7 +359,7 @@
         <el-button
           type="primary"
           @click="saveOutputs"
-          :disabled="selectedBatch && sumTotalKG > selectedBatch.totalInputKG"
+          :disabled="selectedBatch && (sumTotalKG > selectedBatch.totalInputKG || selectedBatch.totalInputKG === 0 || sumTotalKG === 0 || !outputForm.outputDate)"
           >Kaydet</el-button
         >
       </span>
@@ -651,6 +659,7 @@ export default {
           position: 'top-right'
         })
         this.inputDialogVisible = false
+        this.resetInputForm()
         await this.fetchAllProductions()
       } catch (err) {
         console.error(err)
@@ -662,7 +671,7 @@ export default {
     openOutputDialog(batch, editable = false) {
       this.selectedBatch = batch
       this.outputDateEditable = editable
-      this.outputForm.outputDate = batch.outputDate ? batch.outputDate : null
+      this.outputForm.outputDate = batch.isCompleted ? batch.outputDate : null
       this.outputForm.notes = batch.notes || ''
       this.outputForm.productTypePayload = this.mapOutputToForm(batch.outputList)
       this.outputDialogVisible = true
