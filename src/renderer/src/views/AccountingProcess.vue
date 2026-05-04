@@ -581,10 +581,6 @@ export default {
   async mounted() {
     // Sadece Accounting ekranından gelebilir
     const user = this.$route.params?.user
-    if (!user) {
-      this.$router.replace({ name: 'Accounting' })
-      return
-    }
 
     this.routeUser = user
     await this.fetchAllProducts()

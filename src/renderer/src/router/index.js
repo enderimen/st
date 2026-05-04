@@ -10,7 +10,6 @@ import Manufacture from '../views/Manufacture.vue';
 import Products from '../views/Products.vue';
 import Settings from '../views/Settings.vue';
 import Profile from '../views/Profile.vue';
-import Accounting from '../views/Accounting.vue';
 import AccountingProcess from '../views/AccountingProcess.vue';
 
 import AuthLayout from '../layouts/AuthLayout.vue'
@@ -32,7 +31,6 @@ const router = new Router({
       children: [
         { path: '', name: 'Home', component: Home },
         { path: 'musteriler', name: 'Customers', component: Customers },
-        { path: 'tum-cariler', name: 'Accounting', component: Accounting },
         { path: 'tum-cari-islemleri', name: 'AccountingProcess', component: AccountingProcess },
         { path: 'tedarikciler', name: 'Vendors', component: Vendors },
         { path: 'tedarikciler/:id', name: 'VendorDetail', component: () => import('../views/VendorDetail.vue') },

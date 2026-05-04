@@ -115,7 +115,12 @@
       </el-table-column>
       <el-table-column fixed="right" label="İşlem" width="325">
         <template v-slot="scope">
-          <el-button type="info" size="small" icon="el-icon-search" @click="handleClick(scope.row)"
+          <el-button
+            type="info"
+            size="small"
+            icon="el-icon-search"
+            :disabled="!scope.row.hasBalance && !scope.row.isRetail"
+            @click="handleClick(scope.row)"
             >Detay</el-button
           >
 
@@ -496,9 +501,21 @@ export default {
 
       // 2. Sezon Filtresi
       if (this.filter.seasonId) {
-        filtered = filtered.filter((item) =>
-          item.balances?.some((b) => b.season_id === this.filter.seasonId)
-        )
+        const selectedSeason = this.getSeasonList.find((s) => s.value === this.filter.seasonId)
+        const seasonYear = selectedSeason ? selectedSeason.label.split(' ')[0] : null
+
+        filtered = filtered.filter((item) => {
+          // Bu sezonda carisi olanlar
+          const hasBalanceInSeason = item.balances?.some((b) => b.season_id === this.filter.seasonId)
+          if (hasBalanceInSeason) return true
+
+          // Carisi olmayıp bu sezonda (yılında) oluşturulanlar
+          if (seasonYear && item.createdAt) {
+            return item.createdAt.startsWith(seasonYear)
+          }
+
+          return false
+        })
       }
 
       // 3. Sıralama: Perakende (Dükkan) olanlar her zaman en üstte, diğerleri A-Z
