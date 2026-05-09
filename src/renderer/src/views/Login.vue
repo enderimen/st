@@ -180,10 +180,16 @@ export default {
             }
           } catch (error) {
             console.error('Login error:', error)
+
+            let errorMessage = error.message || 'Giriş yapılamadı, bilgilerinizi kontrol edin.'
+            if (error.message === 'Invalid login credentials') {
+              errorMessage = 'Kullanıcı bilgilerinizi kontrol edin!'
+            }
+
             this.$notify({
               title: 'Hata',
               type: 'error',
-              message: error.message || 'Giriş yapılamadı, bilgilerinizi kontrol edin.',
+              message: errorMessage,
               duration: 3000
             })
           } finally {

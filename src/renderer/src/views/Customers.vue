@@ -275,10 +275,7 @@
             </el-col>
             <el-col :span="5">
               <el-form-item label="Toplam Ödenen">
-                <price-input
-                  v-model="formData.totalPaidAmount"
-                  disabled
-                />
+                <price-input v-model="formData.totalPaidAmount" disabled />
               </el-form-item>
             </el-col>
             <el-col :span="5">
@@ -356,14 +353,45 @@
           show-summary
           :summary-method="getTransactionSummaries"
         >
-          <el-table-column label="Tarih" width="200">
+          <el-table-column label="Tarih" width="150">
             <template v-slot="scope">
-              {{ scope.row.created_at | formatDate }}
+              <el-date-picker
+                v-if="scope.row.isEditing"
+                v-model="scope.row.created_at"
+                type="date"
+                size="mini"
+                style="width: 100%"
+                :clearable="false"
+              ></el-date-picker>
+              <span v-else>{{ scope.row.created_at | formatDate }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="amount_kg" label="Alınan (KG)" width="150"></el-table-column>
-          <el-table-column prop="paid_amount" label="Tutar (₺)" width="150"></el-table-column>
-          <el-table-column label="Birim Fiyat" width="150">
+          <el-table-column prop="amount_kg" label="Alınan (KG)">
+            <template v-slot="scope">
+              <el-input-number
+                v-if="scope.row.isEditing"
+                v-model="scope.row.amount_kg"
+                :min="0"
+                :precision="2"
+                :controls="false"
+                size="mini"
+                style="width: 100%"
+              ></el-input-number>
+              <span v-else>{{ scope.row.amount_kg }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="paid_amount" label="Tutar (₺)">
+            <template v-slot="scope">
+              <price-input
+                v-if="scope.row.isEditing"
+                v-model="scope.row.paid_amount"
+                size="mini"
+                style="width: 100%"
+              />
+              <span v-else>{{ scope.row.paid_amount }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="Birim Fiyat" width="100">
             <template v-slot="scope">
               <span v-if="scope.row.amount_kg > 0">
                 {{ (scope.row.paid_amount / scope.row.amount_kg) | formatNumber }} ₺
@@ -373,7 +401,17 @@
           </el-table-column>
           <el-table-column label="Ödeme Tipi">
             <template v-slot="scope">
-              <el-tag size="mini" type="info">
+              <el-select
+                v-if="scope.row.isEditing"
+                v-model="scope.row.payment_type"
+                size="mini"
+                style="width: 100%"
+              >
+                <el-option label="Nakit" value="0"></el-option>
+                <el-option label="Havale" value="1"></el-option>
+                <el-option label="Kredi Kartı" value="2"></el-option>
+              </el-select>
+              <el-tag v-else size="mini" type="info">
                 {{
                   scope.row.payment_type === '0'
                     ? 'Nakit'
@@ -382,6 +420,34 @@
                     : 'Kredi Kartı'
                 }}
               </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="İşlem" width="90" fixed="right">
+            <template v-slot="scope">
+              <el-button
+                v-if="!scope.row.isEditing"
+                size="mini"
+                type="primary"
+                icon="el-icon-edit"
+                circle
+                @click="editTransaction(scope.row)"
+              ></el-button>
+              <template v-else>
+                <el-button
+                  size="mini"
+                  type="success"
+                  icon="el-icon-check"
+                  circle
+                  @click="saveTransaction(scope.row)"
+                ></el-button>
+                <el-button
+                  size="mini"
+                  type="danger"
+                  icon="el-icon-close"
+                  circle
+                  @click="cancelEditTransaction(scope.row)"
+                ></el-button>
+              </template>
             </template>
           </el-table-column>
         </el-table>
@@ -506,7 +572,9 @@ export default {
 
         filtered = filtered.filter((item) => {
           // Bu sezonda carisi olanlar
-          const hasBalanceInSeason = item.balances?.some((b) => b.season_id === this.filter.seasonId)
+          const hasBalanceInSeason = item.balances?.some(
+            (b) => b.season_id === this.filter.seasonId
+          )
           if (hasBalanceInSeason) return true
 
           // Carisi olmayıp bu sezonda (yılında) oluşturulanlar
@@ -770,11 +838,74 @@ export default {
           .order('created_at', { ascending: false })
 
         if (error) throw error
-        this.transactionHistory = data
+        this.transactionHistory = data.map((item) => ({ ...item, isEditing: false }))
       } catch (error) {
         console.error('Error fetching transactions:', error)
       } finally {
         this.loadingHistory = false
+      }
+    },
+    editTransaction(row) {
+      this.$set(row, 'originalData', { ...row })
+      row.isEditing = true
+    },
+    cancelEditTransaction(row) {
+      Object.assign(row, row.originalData)
+      row.isEditing = false
+    },
+    async saveTransaction(row) {
+      try {
+        const diffKg = Number(row.amount_kg) - Number(row.originalData.amount_kg)
+        const diffPaid = Number(row.paid_amount) - Number(row.originalData.paid_amount)
+
+        const { error } = await supabase
+          .from('customer_transactions')
+          .update({
+            created_at: new Date(row.created_at).toISOString(),
+            amount_kg: Number(row.amount_kg),
+            paid_amount: Number(row.paid_amount),
+            payment_type: row.payment_type
+          })
+          .eq('id', row.id)
+
+        if (error) throw error
+
+        if (diffKg !== 0 || diffPaid !== 0) {
+          const { data: balance } = await supabase
+            .from('customer_balances')
+            .select('*')
+            .eq('customer_id', row.customer_id)
+            .eq('season_id', row.season_id)
+            .maybeSingle()
+
+          if (balance) {
+            const newTotalQuota = Number(balance.total_kg_quota) + diffKg
+            const newTotalPaid = Number(balance.total_paid_amount) + diffPaid
+            const newRemaining = Number(balance.remaining_kg_quota) + diffKg
+
+            await supabase
+              .from('customer_balances')
+              .update({
+                total_kg_quota: newTotalQuota,
+                total_paid_amount: newTotalPaid,
+                remaining_kg_quota: newRemaining
+              })
+              .eq('id', balance.id)
+
+            if (this.formData.id === row.customer_id && this.formData.seasonId === row.season_id) {
+              this.formData.totalKgQuota += diffKg
+              this.formData.totalPaidAmount += diffPaid
+              this.formData.remainingKgQuota += diffKg
+            }
+          }
+        }
+
+        row.isEditing = false
+        this.$message.success('İşlem başarıyla güncellendi')
+        await this.getAllCustomer()
+      } catch (err) {
+        console.error(err)
+        this.$message.error('İşlem güncellenirken hata oluştu')
       }
     },
     async isOpenDialog(type, row) {
