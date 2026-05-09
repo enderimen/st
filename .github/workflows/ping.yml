@@ -1,0 +1,18 @@
+name: Supabase Keep-Alive (Ping)
+
+on:
+  schedule:
+    # Haftada iki kez (Pazartesi ve Perşembe 09:00'da) çalışıyor
+    - cron: '0 9 * * 1,4'
+  workflow_dispatch:
+
+jobs:
+  ping_supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Ping Request to Tenants Table
+        run: |
+          curl -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/tenants?select=name&limit=1" \
+          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+          -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+          -I

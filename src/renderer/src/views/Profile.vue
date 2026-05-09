@@ -75,16 +75,19 @@ export default {
           this.profile.full_name = profile.full_name
           this.profile.role = profile.role
 
-          // Şirket adını çek
           const { data: tenant } = await supabase
             .from('tenants')
-            .select('name')
+            .select('name, logo_url')
             .eq('id', profile.tenant_id)
             .single()
 
           if (tenant) {
             this.profile.tenant_name = tenant.name
+            this.profile.imageUrl = tenant.logo_url || ''
             localStorage.setItem('tenant_name', tenant.name)
+            if (tenant.logo_url) {
+              localStorage.setItem('tenant_logo_url', tenant.logo_url)
+            }
           }
 
           localStorage.setItem('user_full_name', profile.full_name)
