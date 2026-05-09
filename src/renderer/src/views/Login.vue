@@ -162,7 +162,9 @@ export default {
 
               // Bilgileri sakla
               localStorage.setItem('tenant_id', profile.tenant_id)
-              localStorage.setItem('tenant_name', tenant ? tenant.name : 'Tanımsız Şirket')
+              const tName = tenant ? tenant.name : 'Tanımsız Şirket'
+              localStorage.setItem('tenant_name', tName)
+              document.title = `${tName} | Stok Takip Programı`
               localStorage.setItem('tenant_logo_url', tenant?.logo_url || '')
               localStorage.setItem('user_full_name', profile.full_name)
               localStorage.setItem('user_role', profile.role)

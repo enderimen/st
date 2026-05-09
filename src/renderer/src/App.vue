@@ -8,7 +8,8 @@
 export default {
   name: 'App',
   mounted() {
-    document.title = import.meta.env.VITE_APP_TITLE
+    const tenantName = localStorage.getItem('tenant_name')
+    document.title = tenantName ? `${tenantName} | Stok Takip Programı` : 'Stok Takip Programı'
     
     // Eğer zaten giriş yapılmışsa pencereyi büyüt
     if (localStorage.getItem('tenant_id')) {

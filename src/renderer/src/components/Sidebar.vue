@@ -108,9 +108,13 @@ export default {
     async logout() {
       await supabase.auth.signOut()
       localStorage.removeItem('tenant_id')
+      localStorage.removeItem('tenant_name')
+      localStorage.removeItem('tenant_logo_url')
       localStorage.removeItem('user_full_name')
       localStorage.removeItem('user_role')
       localStorage.removeItem('user_id')
+
+      document.title = 'Stok Takip Programı'
 
       window.api.send('logout')
       this.$router.push({ name: 'Login' })
