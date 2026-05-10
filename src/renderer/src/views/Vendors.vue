@@ -42,7 +42,7 @@
       </el-table-column>
       <el-table-column fixed="right" label="İşlem" width="165">
         <template v-slot="scope">
-          <el-tooltip content="Tedarikçi Detayı / İşlemler" placement="top-start">
+          <el-tooltip content="Detay" placement="top-start">
             <el-button
               type="success"
               icon="el-icon-tickets"
@@ -51,7 +51,7 @@
             ></el-button>
           </el-tooltip>
 
-          <el-tooltip content="Tedarikçiyi Düzenle" placement="top-start">
+          <el-tooltip content="Düzenle" placement="top-start">
             <el-button
               type="primary"
               icon="el-icon-edit"
@@ -60,7 +60,7 @@
             ></el-button>
           </el-tooltip>
 
-          <el-tooltip content="Tedarikçiyi Sil" placement="top-start">
+          <el-tooltip content="Sil" placement="top-start">
             <el-button
               type="danger"
               icon="el-icon-delete"

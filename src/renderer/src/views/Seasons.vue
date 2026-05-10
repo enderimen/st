@@ -229,7 +229,7 @@ export default {
       this.formData.name = onlyLetters.toUpperCase()
     },
     handleClick(row) {
-      this.$router.push({ name: 'Manufacture', params: { season: row.id } })
+      this.$router.push({ name: 'Manufacture', query: { seasonId: row.id } })
     },
     handlePageChange(page) {
       this.currentPage = page

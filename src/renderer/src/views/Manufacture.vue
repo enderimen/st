@@ -187,6 +187,7 @@
             filterable
             placeholder="Sezon seçin"
             style="width: 100%"
+            :disabled="true"
             @change="updateAutoName"
           >
             <el-option
@@ -359,7 +360,12 @@
         <el-button
           type="primary"
           @click="saveOutputs"
-          :disabled="selectedBatch && (sumTotalKG > selectedBatch.totalInputKG || selectedBatch.totalInputKG === 0 || sumTotalKG === 0 || !outputForm.outputDate)"
+          :disabled="
+            !outputDateEditable ||
+            !outputForm.outputDate ||
+            sumTotalKG === 0 ||
+            (selectedBatch && selectedBatch.totalInputKG === 0)
+          "
           >Kaydet</el-button
         >
       </span>
@@ -424,8 +430,11 @@ export default {
       await this.fetchAuxiliaryData()
       await this.fetchAllProductions()
 
-      // Önce mevcut yıla ait sezonu seç, yoksa listenin sonundakini seç
-      if (this.defaultSeasonId) {
+      // Öncelik query param'da veya params'ta, sonra mevcut yıla ait sezonda, en son listenin sonundakinde
+      const targetSeasonId = this.$route.query.seasonId || this.$route.params.season
+      if (targetSeasonId) {
+        this.filter.season = targetSeasonId
+      } else if (this.defaultSeasonId) {
         this.filter.season = this.defaultSeasonId
       } else if (this.seasonList.length > 0) {
         this.filter.season = this.seasonList[this.seasonList.length - 1].value
@@ -818,6 +827,18 @@ export default {
       push(ptp.plainBrine, 'Salamura', false)
       push(ptp.herbBrine, 'Salamura', true)
       return outputs
+    }
+  },
+  watch: {
+    '$route.query.seasonId': {
+      handler(val) {
+        if (val) this.filter.season = val
+      }
+    },
+    '$route.params.season': {
+      handler(val) {
+        if (val) this.filter.season = val
+      }
     }
   }
 }

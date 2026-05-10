@@ -90,20 +90,13 @@
       </el-table-column>
       <el-table-column fixed="right" label="İşlem" width="145">
         <template v-slot="scope">
-          <el-tooltip
-            class="item"
-            effect="dark"
-            :content="`${scope.row.name.split(' ')[0]} Üretimlerini Gör`"
-            placement="top-start"
+          <el-button
+            type="info"
+            size="small"
+            icon="el-icon-notebook-2"
+            @click="handleClick('Manufacture', scope.row.id)"
+            >Üretimleri Gör</el-button
           >
-            <el-button
-              type="info"
-              size="small"
-              icon="el-icon-notebook-2"
-              @click="handleClick('Manufacture', scope.row.id)"
-              >Üretimleri Gör</el-button
-            >
-          </el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -757,7 +750,11 @@ export default {
         }) || []
     },
     handleClick(name, seasonId) {
-      this.$router.push({ name, params: { season: seasonId } })
+      if (name === 'Manufacture') {
+        this.$router.push({ name, query: { seasonId } })
+      } else {
+        this.$router.push({ name, params: { season: seasonId } })
+      }
     },
     handlePageChange(page) {
       this.currentPage = page
