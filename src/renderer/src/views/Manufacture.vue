@@ -122,7 +122,7 @@
           </el-tooltip>
         </template>
       </el-table-column>
-      <el-table-column fixed="right" label="İşlem" width="200">
+      <el-table-column fixed="right" label="İşlem" width="250">
         <template v-slot="scope">
           <div style="display: flex; gap: 8px">
             <el-button
@@ -151,6 +151,14 @@
                 >Detay</el-button
               >
             </el-tooltip>
+            <el-button
+              v-if="!scope.row.isCompleted"
+              type="danger"
+              size="small"
+              circle
+              icon="el-icon-delete"
+              @click="deleteBatch(scope.row)"
+            ></el-button>
           </div>
         </template>
       </el-table-column>
@@ -631,6 +639,44 @@ export default {
           this.$message.error('Parti oluşturulurken hata oluştu.')
         }
       })
+    },
+    async deleteBatch(batch) {
+      try {
+        await this.$confirm(
+          `${batch.batchName} silinecektir. Bu işlem partiye bağlı tüm alımları ve çıktıları da silecektir. Emin misiniz?`,
+          'Uyarı',
+          {
+            confirmButtonText: 'Evet, Hepsini Sil',
+            cancelButtonText: 'İptal',
+            type: 'warning'
+          }
+        )
+
+        // 1. Çıktıları sil
+        await supabase.from('production_outputs').delete().eq('batch_id', batch.id)
+
+        // 2. Girdileri (Süt alımlarını) sil
+        await supabase.from('production_inputs').delete().eq('batch_id', batch.id)
+
+        // 3. Partiyi sil
+        const { error } = await supabase.from('production_batches').delete().eq('id', batch.id)
+
+        if (error) throw error
+
+        this.$notify({
+          title: 'Başarılı',
+          type: 'success',
+          message: 'Parti ve bağlı tüm veriler silindi!',
+          duration: 3000,
+          position: 'top-right'
+        })
+        await this.fetchAllProductions()
+      } catch (err) {
+        if (err !== 'cancel') {
+          console.error(err)
+          this.$message.error('Silme işlemi sırasında hata oluştu.')
+        }
+      }
     },
 
     editBatch(batch) {

@@ -12,7 +12,22 @@
           Geçmişi
         </h2>
       </div>
-      <div>
+      <div style="display: flex; align-items: center; gap: 15px">
+        <div v-if="totalDebt > 0" style="font-size: 16px; font-weight: bold">
+          Toplam Borç:
+          <el-tag
+            type="danger"
+            effect="dark"
+            style="font-size: 16px; padding: 0 10px; height: 32px; line-height: 32px"
+          >
+            {{ totalDebt | formatNumber }} ₺
+          </el-tag>
+        </div>
+        <div v-else-if="!loading && inputs.length > 0" style="font-size: 16px">
+          <el-tag type="success" effect="dark" style="height: 32px; line-height: 32px">
+            Borç Bulunmuyor
+          </el-tag>
+        </div>
         <el-button type="success" @click="openInputDialog()" icon="el-icon-circle-plus">
           Yeni Alım Ekle
         </el-button>
@@ -171,10 +186,10 @@
                 {{ (inputForm.totalPurchaseAmount - inputForm.paidAmount) | formatNumber }} ₺
               </div>
               <div
-                v-if="inputForm.id && (inputForm.totalPurchaseAmount - inputForm.paidAmount) > 0"
-                style="margin-top: 15px;"
+                v-if="inputForm.id && inputForm.totalPurchaseAmount - inputForm.paidAmount > 0"
+                style="margin-top: 15px"
               >
-                <div style="font-size: 14px; margin-bottom: 5px;">Ödenecek Tutar (₺)</div>
+                <div style="font-size: 14px; margin-bottom: 5px">Ödenecek Tutar (₺)</div>
                 <price-input v-model="inputForm.additionalPayment" :decimals="2" />
               </div>
             </el-form-item>
@@ -254,6 +269,12 @@ export default {
     paginatedData() {
       const start = (this.currentPage - 1) * this.pageSize
       return this.inputs?.slice(start, start + this.pageSize)
+    },
+    totalDebt() {
+      if (!this.inputs) return 0
+      const totalPurchase = this.inputs.reduce((s, r) => s + (r.total_purchase_amount || 0), 0)
+      const totalPaid = this.inputs.reduce((s, r) => s + (r.paid_amount || 0), 0)
+      return totalPurchase - totalPaid
     }
   },
   async mounted() {
@@ -342,7 +363,9 @@ export default {
             input_weight: this.inputForm.inputWeight,
             unit_price: normalizeNumber(this.inputForm.unitPrice),
             total_purchase_amount: normalizeNumber(this.inputForm.totalPurchaseAmount),
-            paid_amount: normalizeNumber(this.inputForm.paidAmount) + normalizeNumber(this.inputForm.additionalPayment || 0),
+            paid_amount:
+              normalizeNumber(this.inputForm.paidAmount) +
+              normalizeNumber(this.inputForm.additionalPayment || 0),
             payment_type: this.inputForm.paymentType
           }
           // Remove batch_id logic here
