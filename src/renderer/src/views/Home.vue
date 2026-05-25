@@ -577,7 +577,7 @@ export default {
     }
   },
   async mounted() {
-    alert('yeni günceleme geldi')
+    alert('yeni günceleme geldiiii')
     this.loading = true
     try {
       await this.fetchDashboardData()
