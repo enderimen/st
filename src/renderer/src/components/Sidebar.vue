@@ -15,7 +15,7 @@
 
       <div>
         <p>{{ tenantName }}</p>
-        <sub>v1.0.0</sub>
+        <sub>v{{ appVersion }}</sub>
       </div>
     </div>
     <el-menu
@@ -94,6 +94,7 @@
 <script>
 import { supabase } from '../utils/supabase'
 import globalMixin from '../mixin/global.mixin.js'
+import packageInfo from '../../../../package.json'
 
 export default {
   name: 'Sidebar',
@@ -138,6 +139,11 @@ export default {
             position: 'top-right'
           })
         })
+    }
+  },
+  computed: {
+    appVersion() {
+      return packageInfo.version || '1.0.0'
     }
   }
 }

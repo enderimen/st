@@ -90,7 +90,7 @@
     >
       <el-form label-position="top" :model="formData" :rules="rules" ref="formRef">
         <el-form-item label="Ad Soyad" prop="full_name">
-          <el-input v-model="formData.full_name"></el-input>
+          <el-input v-model="formData.full_name" @input="handleNameInput"></el-input>
         </el-form-item>
         <el-form-item label="Telefon" prop="phone">
           <el-input
@@ -162,9 +162,14 @@ export default {
   },
   computed: {
     filteredData() {
-      if (!this.filter.search) return this.vendorList
-      return this.vendorList?.filter((item) =>
-        item.full_name?.toLowerCase().includes(this.filter.search.toLowerCase())
+      let list = this.vendorList || []
+      if (this.filter.search) {
+        list = list.filter((item) =>
+          item.full_name?.toLowerCase().includes(this.filter.search.toLowerCase())
+        )
+      }
+      return [...list].sort((a, b) =>
+        (a.full_name || '').localeCompare(b.full_name || '', 'tr', { sensitivity: 'base' })
       )
     },
     paginatedData() {
@@ -255,7 +260,7 @@ export default {
     async addVendor(payload) {
       const { error } = await supabase.from('vendors').insert([
         {
-          full_name: payload.full_name,
+          full_name: (payload.full_name || '').toLocaleUpperCase('tr-TR'),
           phone: payload.phone,
           address: payload.address,
           tenant_id: this.currentTenantId
@@ -268,7 +273,7 @@ export default {
       const { error } = await supabase
         .from('vendors')
         .update({
-          full_name: payload.full_name,
+          full_name: (payload.full_name || '').toLocaleUpperCase('tr-TR'),
           phone: payload.phone,
           address: payload.address
         })
@@ -414,6 +419,9 @@ export default {
           6
         )} ${digits.substring(6, 8)} ${digits.substring(8, 10)}`
       }
+    },
+    handleNameInput(value) {
+      this.formData.full_name = (value || '').toLocaleUpperCase('tr-TR')
     }
   }
 }

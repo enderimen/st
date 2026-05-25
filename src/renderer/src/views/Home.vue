@@ -784,7 +784,10 @@ export default {
           return
         }
 
-        const isKgColumn = column?.property && column.property.toLowerCase().includes('kg')
+        const isKgColumn =
+          column?.property &&
+          (column.property.toLowerCase().includes('kg') ||
+            column.property.toLowerCase().includes('weight'))
 
         if (isKgColumn) {
           const total = data?.reduce((prev, curr) => {

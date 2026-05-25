@@ -100,7 +100,7 @@
           <el-tag v-else type="info" effect="dark" size="small">-</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="Parti Birim Maliyeti(₺/kg)" align="center">
+      <el-table-column prop="unitCostPerKg" label="Parti Birim Maliyeti(₺/kg)" align="center">
         <template v-slot="scope">
           <span v-if="scope.row.isCompleted && scope.row.totalOutputKG > 0">
             {{ (scope.row.totalCost / scope.row.totalOutputKG) | formatNumber }} ₺
@@ -844,7 +844,9 @@ export default {
       const totalWasteKG = data
         .filter((r) => r.isCompleted && r.totalWasteKG !== null)
         .reduce((s, r) => s + r.totalWasteKG, 0)
-      const avgUnitCost = totalInputKG > 0 ? totalCost / totalInputKG : 0
+      const completedCost = data.filter((r) => r.isCompleted && (r.totalOutputKG || 0) > 0).reduce((s, r) => s + (r.totalCost || 0), 0)
+      const completedOutputKG = data.filter((r) => r.isCompleted && (r.totalOutputKG || 0) > 0).reduce((s, r) => s + (r.totalOutputKG || 0), 0)
+      const avgUnitCost = completedOutputKG > 0 ? completedCost / completedOutputKG : 0
 
       const colMap = {
         totalInputKG: `${this.$options.filters.formatNumber(totalInputKG)} kg`,

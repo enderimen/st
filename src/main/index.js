@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, nativeImage } from 'electron';
 import { join } from 'path';
 import { electronApp, optimizer, is } from '@electron-toolkit/utils';
-/* import icon from '../../resources/icon.png?asset'; */
+import { autoUpdater } from "electron-updater";
 
 const iconPath = is.dev
   ? join(process.cwd(), 'resources/icon.png')
@@ -49,7 +49,6 @@ function createWindow() {
   }
 }
 
-
 // Login sonrası ana sayfaya geç
 export function goToMainPage() {
   if (!mainWindow) return;
@@ -71,9 +70,36 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
   createWindow()
+
+  if (!is.dev) {
+    setTimeout(() => {
+      autoUpdater.checkForUpdatesAndNotify();
+    }, 5000);
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+});
+
+autoUpdater.on('update-available', () => {
+  if (mainWindow) {
+    mainWindow.webContents.send('update-message', 'Yeni bir güncelleme bulundu, indiriliyor...');
+  }
+});
+
+autoUpdater.on('update-downloaded', () => {
+  if (mainWindow) {
+    mainWindow.webContents.send('update-message', 'Sistem güncellendi. Yeni özelliklerin devreye girmesi için uygulama yeniden başlatılıyor, lütfen tekrar giriş yapın.');
+    
+    setTimeout(() => {
+      autoUpdater.quitAndInstall();
+    }, 5000);
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  console.error("Güncelleme hatası:", err);
 });
 
 app.on('window-all-closed', () => {
@@ -81,7 +107,6 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', (e) => {
-  // Burada logout gibi cleanup yapabilirsin
   if (mainWindow) {
     mainWindow.webContents.executeJavaScript('localStorage.removeItem("token")');
   }

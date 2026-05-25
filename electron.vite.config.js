@@ -11,6 +11,7 @@ export default defineConfig({
   },
   renderer: {
     envDir: resolve(__dirname), 
+    envPrefix: 'VITE_',
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src')
