@@ -1,6 +1,6 @@
 {
   "name": "senkoylum-peynircilik",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Stok Takip Uygulaması",
   "main": "./out/main/index.js",
   "author": "Ender İmen",
