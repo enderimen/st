@@ -115,8 +115,10 @@ autoUpdater.on('update-downloaded', () => {
 
 autoUpdater.on('error', (err) => {
   console.error("Güncelleme hatası:", err);
+  const errorText = err instanceof Error ? err.message : JSON.stringify(err);
   if (mainWindow) {
-    mainWindow.webContents.send('update-message', 'Güncelleme denetlenirken bir hata oluştu veya bağlantı sağlanamadı.');
+    mainWindow.webContents.send('update-message', `Güncelleme denetlenirken bir hata oluştu veya bağlantı sağlanamadı. Hata Detayı: ${errorText}`);
+    console.log("Güncelleme hatası: ", errorText);
   }
 });
 
