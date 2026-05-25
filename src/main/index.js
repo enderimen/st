@@ -84,12 +84,6 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
   createWindow()
 
-  if (!is.dev) {
-    setTimeout(() => {
-      autoUpdater.checkForUpdatesAndNotify();
-    }, 5000);
-  }
-
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
