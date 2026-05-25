@@ -66,8 +66,21 @@ ipcMain.on('logout', () => {
   app.quit();
 });
 
+ipcMain.on('check-for-updates', () => {
+  if (is.dev) {
+    if (mainWindow) {
+      mainWindow.webContents.send('update-message', 'Güncellemeler denetleniyor...');
+      setTimeout(() => {
+        mainWindow.webContents.send('update-message', `Uygulamanız güncel (v${app.getVersion()}).`);
+      }, 1500);
+    }
+  } else {
+    autoUpdater.checkForUpdatesAndNotify();
+  }
+});
+
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('com.electron.app')
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
   createWindow()
 
@@ -82,6 +95,18 @@ app.whenReady().then(() => {
   })
 });
 
+autoUpdater.on('checking-for-update', () => {
+  if (mainWindow) {
+    mainWindow.webContents.send('update-message', 'Güncellemeler denetleniyor...');
+  }
+});
+
+autoUpdater.on('update-not-available', () => {
+  if (mainWindow) {
+    mainWindow.webContents.send('update-message', `Uygulamanız güncel. En son sürümü (v${app.getVersion()}) kullanıyorsunuz.`);
+  }
+});
+
 autoUpdater.on('update-available', () => {
   if (mainWindow) {
     mainWindow.webContents.send('update-message', 'Yeni bir güncelleme bulundu, indiriliyor...');
@@ -90,16 +115,15 @@ autoUpdater.on('update-available', () => {
 
 autoUpdater.on('update-downloaded', () => {
   if (mainWindow) {
-    mainWindow.webContents.send('update-message', 'Sistem güncellendi. Yeni özelliklerin devreye girmesi için uygulama yeniden başlatılıyor, lütfen tekrar giriş yapın.');
-    
-    setTimeout(() => {
-      autoUpdater.quitAndInstall();
-    }, 5000);
+    mainWindow.webContents.send('update-message', 'Güncelleme başarıyla indirildi ve hazır! Uygulamayı kapatıp tekrar açtığınızda yeni sürüm otomatik olarak devreye girecektir.');
   }
 });
 
 autoUpdater.on('error', (err) => {
   console.error("Güncelleme hatası:", err);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-message', 'Güncelleme denetlenirken bir hata oluştu veya bağlantı sağlanamadı.');
+  }
 });
 
 app.on('window-all-closed', () => {

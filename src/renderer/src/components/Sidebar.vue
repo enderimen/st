@@ -13,9 +13,21 @@
         style="font-size: 40px; color: #fff; margin-bottom: 10px"
       ></i>
 
-      <div>
+      <div v-if="!collapsed">
         <p>{{ tenantName }}</p>
-        <sub>v{{ appVersion }}</sub>
+        <div
+          style="display: flex; align-items: left; justify-content: left; gap: 8px; margin-top: 4px"
+        >
+          <sub style="font-size: 11px; opacity: 0.8; line-height: 1.2">v{{ appVersion }}</sub>
+          <el-button
+            type="text"
+            icon="el-icon-refresh"
+            style="padding: 0; color: #ffd04b; font-size: 12px"
+            title="Güncellemeleri Denetle"
+            @click="checkForUpdates"
+            >Güncellemeleri Denetle</el-button
+          >
+        </div>
       </div>
     </div>
     <el-menu
@@ -139,6 +151,9 @@ export default {
             position: 'top-right'
           })
         })
+    },
+    checkForUpdates() {
+      window.electron.ipcRenderer.send('check-for-updates')
     }
   },
   computed: {
