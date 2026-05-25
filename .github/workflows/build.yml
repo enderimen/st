@@ -22,6 +22,6 @@ jobs:
       - name: Build and Publish
         run: npm run build:win
         env:
-          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          VITE_SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
