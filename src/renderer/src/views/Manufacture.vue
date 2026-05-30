@@ -643,7 +643,7 @@ export default {
     async deleteBatch(batch) {
       try {
         await this.$confirm(
-          `${batch.batchName} silinecektir. Bu işlem partiye bağlı tüm alımları ve çıktıları da silecektir. Emin misiniz?`,
+          `${batch.batchName} silinecektir. Bu işlem partiye bağlı tüm alımları ve çıktıları da silecektir. Emin misiniz? \n Not: Tedarikçilerinizden aldığınız ham peynir girişlerini manuel silmeniz gerekecektir.`,
           'Uyarı',
           {
             confirmButtonText: 'Evet, Hepsini Sil',
