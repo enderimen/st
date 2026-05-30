@@ -2,7 +2,7 @@
   <el-card class="card-view box-card">
     <div class="card-header">
       <h1>
-        <i class="el-icon-edit-outline"></i> {{ routeUser?.name || 'Cari' }} - Cari Ekstreleri
+        <i class="el-icon-edit-outline"></i> {{ (routeUser?.name || 'Cari').toUpperCase() }} - Cari Ekstreleri
       </h1>
       <div class="header-actions">
         <el-button
@@ -13,7 +13,11 @@
           @click="syncRemainingQuota"
           >Bakiyeyi Düzelt</el-button
         >
-        <el-button type="success" icon="el-icon-notebook-2" @click="newBuyProcess"
+        <el-button 
+          type="success" 
+          icon="el-icon-notebook-2" 
+          @click="newBuyProcess"
+          :disabled="!routeUser?.isRetail && overallRemainingKg <= 0"
           >Yeni Alım İşlemi Oluştur</el-button
         >
       </div>
@@ -586,6 +590,13 @@ export default {
     await this.fetchAllProducts()
     await this.getAllCustomerBalance()
     await this.getAllCustomerBalanceExtract()
+
+    // Set active season
+    const currentYear = new Date().getFullYear().toString()
+    const activeSeason = this.getSeasonList?.find((s) => s.label.includes(currentYear))
+    if (activeSeason) {
+      this.filter.season = activeSeason.value
+    }
 
     // Yeni işlem popup'ını aç
     if (this.$route.params?.type === 'add') {

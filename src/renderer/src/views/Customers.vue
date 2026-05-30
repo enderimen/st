@@ -10,7 +10,7 @@
     <div class="search" style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px">
       <el-input
         v-model="filter.search"
-        placeholder="Müşteri adıyla arayın..."
+        placeholder="Müşteri adıyla arayın"
         clearable
         style="width: 300px; flex-shrink: 0"
       />
@@ -219,8 +219,8 @@
           <el-col :span="12">
             <el-form-item label="Müşteri Tipi">
               <el-radio-group v-model="formData.isRetail">
-                <el-radio :label="false">Toptan (Müşteri)</el-radio>
-                <el-radio :label="true">Perakende (Dükkan)</el-radio>
+                <el-radio :label="false" :disabled="editingCustomer">Toptan (Müşteri)</el-radio>
+                <el-radio :label="true" :disabled="editingCustomer">Perakende (Dükkan)</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>
@@ -595,7 +595,15 @@ export default {
     },
     isSaveDisabled() {
       const { phone, fullName, address } = this.formData
-      if (!phone || !fullName || !address === null) return true
+      if (!phone || !fullName || !address) return true
+
+      const nt = this.formData.newTransaction
+      const amountKg = Number(nt?.amountKg || 0)
+      const paidAmount = Number(nt?.paidAmount || 0)
+
+      if ((amountKg > 0 && paidAmount <= 0) || (paidAmount > 0 && amountKg <= 0)) {
+        return true
+      }
 
       if (this.editingCustomer) {
         return JSON.stringify(this.formData) === JSON.stringify(this.originalFormData)
@@ -1125,7 +1133,6 @@ export default {
           })
 
           await this.getAllCustomer()
-          this.dialogVisible = false
         } catch (error) {
           console.error(error)
           this.$message.error('İşlem sırasında bir hata oluştu.')

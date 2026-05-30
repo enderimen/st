@@ -28,6 +28,22 @@
             Borç Bulunmuyor
           </el-tag>
         </div>
+        <el-button
+          v-if="totalDebt > 0"
+          type="warning"
+          icon="el-icon-money"
+          @click="openBulkPaymentDialog"
+        >
+          Borç Öde
+        </el-button>
+        <el-button
+          type="info"
+          icon="el-icon-document"
+          @click="openPaymentHistoryDialog"
+          plain
+        >
+          Ödeme Geçmişi
+        </el-button>
         <el-button type="success" @click="openInputDialog()" icon="el-icon-circle-plus">
           Yeni Alım Ekle
         </el-button>
@@ -169,7 +185,6 @@
             <el-form-item label="Ödenen Miktar (₺)" prop="paidAmount">
               <price-input
                 v-model="inputForm.paidAmount"
-                :disabled="!!inputForm.id"
                 :decimals="2"
               />
               <div
@@ -186,11 +201,16 @@
                 {{ (inputForm.totalPurchaseAmount - inputForm.paidAmount) | formatNumber }} ₺
               </div>
               <div
-                v-if="inputForm.id && inputForm.totalPurchaseAmount - inputForm.paidAmount > 0"
-                style="margin-top: 15px"
+                v-else-if="inputForm.totalPurchaseAmount > 0"
+                style="
+                  margin-top: 5px;
+                  color: #67c23a;
+                  font-weight: bold;
+                  font-size: 14px;
+                  text-align: right;
+                "
               >
-                <div style="font-size: 14px; margin-bottom: 5px">Ödenecek Tutar (₺)</div>
-                <price-input v-model="inputForm.additionalPayment" :decimals="2" />
+                Ödendi ✓
               </div>
             </el-form-item>
           </el-col>
@@ -202,6 +222,72 @@
       <span slot="footer">
         <el-button @click="inputDialogVisible = false">Vazgeç</el-button>
         <el-button type="primary" @click="saveInput">Kaydet</el-button>
+      </span>
+    </el-dialog>
+
+    <!-- Dialog: Toplu Borç Öde (Bulk Payment) -->
+    <el-dialog
+      title="Toplu Borç Öde"
+      :visible.sync="bulkPaymentDialogVisible"
+      width="30%"
+      @close="resetBulkPaymentForm"
+    >
+      <el-form
+        label-position="top"
+        :model="bulkPaymentForm"
+        ref="bulkPaymentFormRef"
+        :rules="bulkPaymentRules"
+      >
+        <el-form-item label="Ödeme Tutarı (₺)" prop="amount">
+          <price-input v-model="bulkPaymentForm.amount" :decimals="2" />
+          <div style="margin-top: 5px; color: #909399; font-size: 13px">
+            Toplam Borç: {{ totalDebt | formatNumber }} ₺
+          </div>
+        </el-form-item>
+        <el-form-item label="Ödeme Türü" prop="paymentType">
+          <el-select v-model="bulkPaymentForm.paymentType" style="width: 100%">
+            <el-option v-for="t in paymentTypes" :key="t" :label="t" :value="t"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Not">
+          <el-input type="textarea" v-model="bulkPaymentForm.notes"></el-input>
+        </el-form-item>
+      </el-form>
+      <span slot="footer">
+        <el-button @click="bulkPaymentDialogVisible = false">Vazgeç</el-button>
+        <el-button type="primary" :loading="bulkPaymentLoading" :disabled="!isBulkPaymentValid" @click="saveBulkPayment">
+          Ödemeyi Kaydet
+        </el-button>
+      </span>
+    </el-dialog>
+
+    <!-- Dialog: Ödeme Geçmişi (Payment History) -->
+    <el-dialog
+      title="Ödeme Geçmişi"
+      :visible.sync="paymentHistoryDialogVisible"
+      width="50%"
+    >
+      <div v-if="paymentHistoryLoading" style="padding: 20px">
+        <el-skeleton :rows="5" animated />
+      </div>
+      <el-table
+        v-else
+        :data="paymentHistory"
+        border
+        style="width: 100%"
+        empty-text="Henüz ödeme kaydı yok"
+      >
+        <el-table-column prop="paid_at" label="Tarih" width="160">
+          <template v-slot="s">{{ s.row.paid_at | formatDate }}</template>
+        </el-table-column>
+        <el-table-column prop="amount" label="Tutar" width="160">
+          <template v-slot="s">{{ s.row.amount | formatNumber }} ₺</template>
+        </el-table-column>
+        <el-table-column prop="payment_type" label="Ödeme Türü" width="160"></el-table-column>
+        <el-table-column prop="notes" label="Not"></el-table-column>
+      </el-table>
+      <span slot="footer">
+        <el-button @click="paymentHistoryDialogVisible = false">Kapat</el-button>
       </span>
     </el-dialog>
   </el-card>
@@ -258,7 +344,24 @@ export default {
       paymentRules: {
         paymentDate: [{ required: true, message: 'Tarih seçiniz', trigger: 'change' }],
         paidAmount: [{ required: true, message: 'Tutar giriniz', trigger: 'blur' }]
-      }
+      },
+
+      // Bulk payment (Toplu Borç Öde)
+      bulkPaymentDialogVisible: false,
+      bulkPaymentLoading: false,
+      bulkPaymentForm: {
+        amount: 0,
+        paymentType: 'Nakit',
+        notes: ''
+      },
+      bulkPaymentRules: {
+        amount: [{ required: true, message: 'Tutar giriniz', trigger: 'blur' }]
+      },
+
+      // Payment history (Ödeme Geçmişi)
+      paymentHistoryDialogVisible: false,
+      paymentHistoryLoading: false,
+      paymentHistory: []
     }
   },
   filters: { formatDate, formatNumber },
@@ -269,6 +372,10 @@ export default {
     paginatedData() {
       const start = (this.currentPage - 1) * this.pageSize
       return this.inputs?.slice(start, start + this.pageSize)
+    },
+    isBulkPaymentValid() {
+      const amount = normalizeNumber(this.bulkPaymentForm.amount)
+      return amount > 0 && amount <= this.totalDebt
     },
     totalDebt() {
       if (!this.inputs) return 0
@@ -351,7 +458,6 @@ export default {
     },
     calcTotal() {
       this.inputForm.totalPurchaseAmount = this.inputForm.inputWeight * this.inputForm.unitPrice
-      this.inputForm.paidAmount = this.inputForm.totalPurchaseAmount
     },
     async saveInput() {
       this.$refs.inputFormRef.validate(async (valid) => {
@@ -363,9 +469,7 @@ export default {
             input_weight: this.inputForm.inputWeight,
             unit_price: normalizeNumber(this.inputForm.unitPrice),
             total_purchase_amount: normalizeNumber(this.inputForm.totalPurchaseAmount),
-            paid_amount:
-              normalizeNumber(this.inputForm.paidAmount) +
-              normalizeNumber(this.inputForm.additionalPayment || 0),
+            paid_amount: normalizeNumber(this.inputForm.paidAmount),
             payment_type: this.inputForm.paymentType
           }
           // Remove batch_id logic here
@@ -449,6 +553,75 @@ export default {
           this.$message.error('Ödeme kaydedilirken hata oluştu.')
         }
       })
+    },
+
+    // ---- Bulk Payment (FIFO) ----
+    openBulkPaymentDialog() {
+      this.resetBulkPaymentForm()
+      this.bulkPaymentDialogVisible = true
+    },
+    resetBulkPaymentForm() {
+      this.bulkPaymentForm = {
+        amount: 0,
+        paymentType: 'Nakit',
+        notes: ''
+      }
+    },
+    async saveBulkPayment() {
+      this.$refs.bulkPaymentFormRef.validate(async (valid) => {
+        if (!valid) return
+
+        const amount = normalizeNumber(this.bulkPaymentForm.amount)
+
+        this.bulkPaymentLoading = true
+        try {
+          const { data, error } = await supabase.rpc('process_supplier_payment', {
+            p_vendor_id: this.vendorId,
+            p_amount: amount,
+            p_payment_type: this.bulkPaymentForm.paymentType,
+            p_notes: this.bulkPaymentForm.notes || null
+          })
+
+          if (error) throw error
+
+          this.$notify({
+            title: 'Başarılı',
+            type: 'success',
+            message: `${this.$options.filters.formatNumber(amount)} ₺ ödeme sisteme kaydedildi.`,
+            duration: 4000,
+            position: 'top-right'
+          })
+
+          this.bulkPaymentDialogVisible = false
+          await this.fetchVendorDetails()
+        } catch (err) {
+          console.error(err)
+          this.$message.error('Ödeme kaydedilirken hata oluştu: ' + (err.message || err))
+        } finally {
+          this.bulkPaymentLoading = false
+        }
+      })
+    },
+
+    // ---- Payment History ----
+    async openPaymentHistoryDialog() {
+      this.paymentHistoryDialogVisible = true
+      this.paymentHistoryLoading = true
+      try {
+        const { data, error } = await supabase
+          .from('supplier_payments')
+          .select('*')
+          .eq('vendor_id', this.vendorId)
+          .order('paid_at', { ascending: false })
+
+        if (error) throw error
+        this.paymentHistory = data || []
+      } catch (err) {
+        console.error(err)
+        this.$message.error('Ödeme geçmişi alınamadı.')
+      } finally {
+        this.paymentHistoryLoading = false
+      }
     },
     async deleteInput(input) {
       try {

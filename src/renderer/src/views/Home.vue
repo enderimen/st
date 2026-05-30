@@ -80,7 +80,7 @@
           {{ scope.row.lossKg | formatNumber }}
         </template>
       </el-table-column>
-      <el-table-column prop="averagePrice" label="Ortalama Maliyet" sortable>
+      <el-table-column prop="averagePrice" label="Ort. Maliyet" sortable>
         <template v-slot="scope"> {{ scope.row.averagePrice | formatNumber }} ₺ </template>
       </el-table-column>
       <el-table-column prop="createdDate" label="Oluşt. Tarihi" sortable>
