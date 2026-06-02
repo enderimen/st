@@ -1,6 +1,6 @@
 <template>
   <div class="login-page">
-    <el-card class="login-card">
+    <el-card class="login-card" v-show="!isSuccess">
       <div class="login-header">
         <el-image
           v-if="tenantLogoUrl"
@@ -78,6 +78,7 @@ export default {
   data() {
     return {
       loading: false,
+      isSuccess: false,
       isOnline: navigator.onLine,
       showOnlineMessage: false,
       loginForm: {
@@ -100,6 +101,11 @@ export default {
   mounted() {
     window.addEventListener('online', this.handleOnline)
     window.addEventListener('offline', this.handleOffline)
+    
+    const savedEmail = localStorage.getItem('user_email')
+    if (savedEmail) {
+      this.loginForm.email = savedEmail
+    }
   },
   beforeDestroy() {
     window.removeEventListener('online', this.handleOnline)
@@ -169,6 +175,7 @@ export default {
               localStorage.setItem('user_full_name', profile.full_name)
               localStorage.setItem('user_role', profile.role)
               localStorage.setItem('user_id', profile.id)
+              localStorage.setItem('user_email', this.loginForm.email)
 
               this.$notify({
                 title: 'Başarılı',
@@ -177,8 +184,12 @@ export default {
                 duration: 2000
               })
 
+              this.isSuccess = true
+
               window.api.send('login-success')
-              this.$router.push({ name: 'Home' })
+              setTimeout(() => {
+                this.$router.push({ name: 'Home' })
+              }, 100)
             }
           } catch (error) {
             console.error('Login error:', error)

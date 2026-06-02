@@ -59,7 +59,7 @@
           {{ scope.row.createdAt | formatDate }}
         </template>
       </el-table-column>
-      <el-table-column prop="fullName" sortable label="Ad Soyad">
+      <el-table-column prop="fullName" sortable label="Ad Soyad" width="250">
         <template v-slot="scope">
           <el-tag v-if="scope.row.isRetail" type="warning">{{ scope.row.fullName }}</el-tag>
           <span v-else class="upper-text">{{ scope.row.fullName }}</span>
@@ -110,7 +110,7 @@
           >
             {{ scope.row.balanceInfo.isClosed ? 'Pasif' : 'Aktif' }}
           </el-tag>
-          <el-tag v-else type="info" size="small">İşlem Bulunmuyor</el-tag>
+          <el-tag v-else type="info" size="small">Sınırsınız Kota</el-tag>
         </template>
       </el-table-column>
       <el-table-column fixed="right" label="İşlem" width="325">
@@ -219,7 +219,7 @@
           <el-col :span="12">
             <el-form-item label="Müşteri Tipi">
               <el-radio-group v-model="formData.isRetail">
-                <el-radio :label="false" :disabled="editingCustomer">Toptan (Müşteri)</el-radio>
+                <el-radio :label="false" :disabled="editingCustomer">Müşteri</el-radio>
                 <el-radio :label="true" :disabled="editingCustomer">Perakende (Dükkan)</el-radio>
               </el-radio-group>
             </el-form-item>
@@ -230,7 +230,13 @@
           <el-divider content-position="left">Cari Durumu</el-divider>
           <el-row :gutter="16">
             <el-col :span="6">
-              <el-form-item label="Sezon">
+              <el-form-item>
+                <span slot="label">
+                  Sezon
+                  <el-tooltip content="Kayıt Dönemi" placement="top">
+                    <i class="el-icon-info" style="margin-left: 2px;"></i>
+                  </el-tooltip>
+                </span>
                 <el-select
                   v-model="formData.seasonId"
                   placeholder="Sezon Seçin"
@@ -293,7 +299,7 @@
         </template>
 
         <template v-if="!formData.isRetail">
-          <el-divider content-position="left">Yeni Kota Alımı / Ödeme</el-divider>
+          <el-divider content-position="left">Kota Ekle</el-divider>
           <el-row :gutter="16" :class="['transaction-form', { disabled: formData.isClosed }]">
             <el-col :span="6">
               <el-form-item label="İşlem Tarihi">
@@ -742,11 +748,7 @@ export default {
         this.loading = false
       }
     },
-    async deleteCustomer(id) {
-      const { error } = await supabase.from('customers').delete().eq('id', id)
-      if (error) throw error
-      await this.getAllCustomer()
-    },
+
     handlePageChange(page) {
       this.currentPage = page
     },
@@ -1141,7 +1143,7 @@ export default {
     },
     open(row) {
       this.$confirm(
-        `${row.fullName} adlı müşteriyi, silmek istediğinden emin misiniz? İlişkili tüm verileri silinecektir.`,
+        `${row.fullName} isimli müşteriyi silmek istediğinize emin misiniz? Eğer müşteriye ait aktif işlem görmemiş kotalar varsa stoğa geri iade edilecektir.`,
         'Müşteri Silme İşlemi',
         {
           distinguishCancelAndClose: true,
@@ -1151,16 +1153,39 @@ export default {
       )
         .then(async () => {
           try {
-            await this.deleteCustomer(row.id)
-            this.$notify({
-              title: 'Başarılı',
-              type: 'success',
-              message: 'Müşteri başarıyla silindi!',
-              duration: 3000,
-              position: 'top-right'
+            const { data, error } = await supabase.rpc('safe_delete_customer', {
+              p_customer_id: row.id
             })
+
+            if (error) {
+              this.$message({
+                message: error.message,
+                type: 'error',
+                duration: 5000,
+                showClose: true
+              })
+              return
+            }
+
+            if (data && data.success) {
+              this.$notify({
+                title: 'Başarılı',
+                type: 'success',
+                message: data.message || 'Müşteri başarıyla silindi ve stoğa devredildi.',
+                duration: 3000,
+                position: 'top-right'
+              })
+              await this.getAllCustomer()
+            } else if (data && !data.success) {
+              this.$message({
+                message: data.message || 'Silme işlemi başarısız oldu.',
+                type: 'error',
+                duration: 5000,
+                showClose: true
+              })
+            }
           } catch (error) {
-            this.$message.error('Müşteri silinirken hata oluştu.')
+            this.$message.error('Müşteri silinirken beklenmeyen bir hata oluştu.')
             console.error(error)
           }
         })

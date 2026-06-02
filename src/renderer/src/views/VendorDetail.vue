@@ -13,18 +13,18 @@
         </h2>
       </div>
       <div style="display: flex; align-items: center; gap: 15px">
-        <div v-if="totalDebt > 0" style="font-size: 16px; font-weight: bold">
+        <div v-if="totalDebt > 0" style="font-size: 16px; font-weight: bold; display: flex; align-items: center; gap: 10px">
           Toplam Borç:
           <el-tag
             type="danger"
             effect="dark"
-            style="font-size: 16px; padding: 0 10px; height: 32px; line-height: 32px"
+            style="font-size: 16px; height: 40px; display: flex; align-items: center;"
           >
             {{ totalDebt | formatNumber }} ₺
           </el-tag>
         </div>
         <div v-else-if="!loading && inputs.length > 0" style="font-size: 16px">
-          <el-tag type="success" effect="dark" style="height: 32px; line-height: 32px">
+          <el-tag type="success" effect="dark" style="height: 40px; display: flex; align-items: center;">
             Borç Bulunmuyor
           </el-tag>
         </div>
@@ -39,12 +39,12 @@
         <el-button
           type="info"
           icon="el-icon-document"
+          style="margin-left: 0"
           @click="openPaymentHistoryDialog"
-          plain
         >
           Ödeme Geçmişi
         </el-button>
-        <el-button type="success" @click="openInputDialog()" icon="el-icon-circle-plus">
+        <el-button type="success" @click="openInputDialog()" icon="el-icon-circle-plus" style="margin-left: 0">
           Yeni Alım Ekle
         </el-button>
       </div>

@@ -47,8 +47,11 @@ function createWindow() {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
-}
 
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.setZoomFactor(0.90)
+  })
+}
 // Login sonrası ana sayfaya geç
 export function goToMainPage() {
   if (!mainWindow) return;

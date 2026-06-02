@@ -65,7 +65,7 @@
     >
       <!-- <el-table-column prop="id" label="ID" width="180"> </el-table-column> -->
       <el-table-column prop="name" label="Sezon" sortable></el-table-column>
-      <el-table-column prop="totalInputWeight" label="Alınan Ham(kg)" sortable>
+      <el-table-column prop="totalInputWeight" label="Ham(kg)" sortable>
         <template v-slot="scope">
           {{ scope.row.totalInputWeight | formatNumber }}
         </template>
