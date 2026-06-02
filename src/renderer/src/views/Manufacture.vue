@@ -394,6 +394,8 @@ export default {
   components: { PriceInput },
   data() {
     return {
+      isMounted: false,
+      loading: false,
       productionList: [],
       seasonList: [],
       productTypes: [],
@@ -436,7 +438,6 @@ export default {
     this.loading = true
     try {
       await this.fetchAuxiliaryData()
-      await this.fetchAllProductions()
 
       // Öncelik query param'da veya params'ta, sonra mevcut yıla ait sezonda, en son listenin sonundakinde
       const targetSeasonId = this.$route.query.seasonId || this.$route.params.season
@@ -447,6 +448,9 @@ export default {
       } else if (this.seasonList.length > 0) {
         this.filter.season = this.seasonList[this.seasonList.length - 1].value
       }
+
+      this.isMounted = true
+      await this.fetchAllProductions()
     } finally {
       this.loading = false
     }
@@ -528,6 +532,10 @@ export default {
       this.productTypes = products || []
     },
     async fetchAllProductions() {
+      if (!this.filter.season) {
+        this.productionList = []
+        return
+      }
       this.loading = true
       const { data, error } = await supabase
         .from('production_batches')
@@ -542,6 +550,7 @@ export default {
         `
         )
         .eq('tenant_id', this.currentTenantId)
+        .eq('season_id', this.filter.season)
         .order('created_at', { ascending: false })
 
       this.loading = false
@@ -886,6 +895,12 @@ export default {
     '$route.params.season': {
       handler(val) {
         if (val) this.filter.season = val
+      }
+    },
+    'filter.season': {
+      async handler(val) {
+        if (!this.isMounted) return
+        await this.fetchAllProductions()
       }
     }
   }
