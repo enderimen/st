@@ -23,28 +23,24 @@ jobs:
 
       - name: Set Timestamp
         id: timestamp
-        # Türkiye saatiyle daha uyumlu olması için UTC+3 veya doğrudan o anki zamanı çeker.
-        # Format: YYYY-MM-DD_HH-MM-SS (Örn: 2026-05-03_21-00-00)
         run: echo "NOW=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
 
       - name: Backup Database
         run: |
           export PGPASSWORD="${{ secrets.DB_PASSWORD }}"
-          
-          # Dosya adını dinamik olarak belirliyoruz
+
           pg_dump -h aws-1-eu-central-1.pooler.supabase.com \
                   -U postgres.rlhhlbnaecljcegabwak \
                   -p 5432 \
                   -d postgres \
                   --no-password \
-                  --no-owner \
-                  --no-privileges > backup_${{ env.NOW }}.sql
+                  -F c \
+                  -b \
+                  -v > backup_${{ env.NOW }}.dump
 
       - name: Upload Backup as Artifact
         uses: actions/upload-artifact@v4
         with:
-          # İndirilecek zip dosyasının adı
           name: supabase-backup-${{ env.NOW }}
-          # Yüklenecek olan sql dosyasının tam adı
-          path: backup_${{ env.NOW }}.sql
+          path: backup_${{ env.NOW }}.dump
           retention-days: 30
