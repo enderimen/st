@@ -64,6 +64,7 @@
             Giriş Yap
           </el-button>
         </el-form-item>
+        <sub style="font-size: 11px; opacity: 0.7; text-align: center; display: block; margin-top: -10px;">v{{ appVersion }}</sub>
       </el-form>
     </el-card>
   </div>
@@ -71,6 +72,7 @@
 <script>
 import { supabase } from '../utils/supabase'
 import globalMixin from '../mixin/global.mixin.js'
+import packageInfo from '../../../../package.json'
 
 export default {
   name: 'Login',
@@ -110,6 +112,11 @@ export default {
   beforeDestroy() {
     window.removeEventListener('online', this.handleOnline)
     window.removeEventListener('offline', this.handleOffline)
+  },
+  computed: {
+    appVersion() {
+      return packageInfo.version || '1.0.0'
+    }
   },
   methods: {
     handleOnline() {

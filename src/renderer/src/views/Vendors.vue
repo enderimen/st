@@ -30,7 +30,7 @@
         </template>
       </el-table-column>
       <el-table-column prop="full_name" sortable label="Ad Soyad"></el-table-column>
-      <el-table-column prop="phone" sortable label="Telefon"></el-table-column>
+      <el-table-column prop="phone" label="Telefon"></el-table-column>
       <el-table-column prop="address" sortable label="Adres"></el-table-column>
       <el-table-column prop="total_purchase" sortable label="Toplam Alım">
         <template v-slot="scope">{{ scope.row.total_purchase | formatNumber }} ₺</template>

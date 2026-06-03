@@ -21,7 +21,7 @@ export default {
   methods: {
     handleUpdateMessage(event, message) {
       this.$notify({
-        title: 'Sistem Güncellemesi',
+        title: 'Sistem Durumu',
         message: message,
         type: 'info',
         duration: 5000
