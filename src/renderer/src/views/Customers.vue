@@ -1138,6 +1138,8 @@ export default {
         } catch (error) {
           console.error(error)
           this.$message.error('İşlem sırasında bir hata oluştu.')
+        } finally {
+          this.dialogVisible = false
         }
       })
     },

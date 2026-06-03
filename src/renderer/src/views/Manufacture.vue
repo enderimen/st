@@ -83,7 +83,7 @@
       </el-table-column>
 
       <el-table-column prop="batchName" sortable label="Parti Adı" min-width="60"></el-table-column>
-      <el-table-column prop="createdAt" sortable label="Oluşturma Tarihi" width="170">
+      <el-table-column prop="createdAt" sortable label="Oluşt. Tarihi" width="170">
         <template v-slot="scope">{{ scope.row.createdAt | formatDate }}</template>
       </el-table-column>
       <el-table-column prop="totalOutputKG" sortable label="Üretilen(kg)" width="135">
@@ -292,6 +292,7 @@
                         size="small"
                         :min="0"
                         :step="1"
+                        :disabled="!outputDateEditable"
                       ></el-input-number>
                     </el-form-item>
                   </el-col>
@@ -307,6 +308,7 @@
                       size="small"
                       :min="0"
                       :step="1"
+                      :disabled="!outputDateEditable"
                     ></el-input-number>
                   </el-form-item>
                 </el-col>
@@ -321,6 +323,7 @@
                       size="small"
                       :min="0"
                       :step="1"
+                      :disabled="!outputDateEditable"
                     ></el-input-number>
                   </el-form-item>
                 </el-col>
@@ -335,6 +338,7 @@
                       size="small"
                       :min="0"
                       :step="1"
+                      :disabled="!outputDateEditable"
                     ></el-input-number>
                   </el-form-item>
                 </el-col>
@@ -364,18 +368,22 @@
         </div>
       </el-form>
       <span slot="footer">
-        <el-button @click="outputDialogVisible = false">Vazgeç</el-button>
-        <el-button
-          type="primary"
-          @click="saveOutputs"
-          :disabled="
-            !outputDateEditable ||
-            !outputForm.outputDate ||
-            sumTotalKG === 0 ||
-            (selectedBatch && selectedBatch.totalInputKG === 0)
-          "
-          >Kaydet</el-button
-        >
+        <template v-if="outputDateEditable">
+          <el-button @click="outputDialogVisible = false">Vazgeç</el-button>
+          <el-button
+            type="primary"
+            @click="saveOutputs"
+            :disabled="
+              !outputForm.outputDate ||
+              sumTotalKG === 0 ||
+              (selectedBatch && selectedBatch.totalInputKG === 0)
+            "
+            >Kaydet</el-button
+          >
+        </template>
+        <template v-else>
+          <el-button type="primary" @click="outputDialogVisible = false">Kapat</el-button>
+        </template>
       </span>
     </el-dialog>
   </el-card>

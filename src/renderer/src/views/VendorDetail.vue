@@ -326,7 +326,7 @@ export default {
         paymentType: 'Nakit',
         notes: ''
       },
-      paymentTypes: ['Nakit', 'Havale/EFT', 'Kredi Kartı', 'Borç'],
+      paymentTypes: ['Nakit', 'Havale/EFT', 'Kredi Kartı'],
       inputRules: {
         receivedAt: [{ required: true, message: 'Alım tarihi seçiniz', trigger: 'change' }],
         inputWeight: [{ required: true, message: 'KG giriniz', trigger: 'blur' }],

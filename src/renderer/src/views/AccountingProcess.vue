@@ -1,9 +1,16 @@
 <template>
   <el-card class="card-view box-card">
     <div class="card-header">
-      <h1>
-        <i class="el-icon-edit-outline"></i> {{ (routeUser?.name || 'Cari').toUpperCase() }} - Cari Ekstreleri
-      </h1>
+      <div style="display: flex; align-items: center; gap: 6px">
+        <el-button
+          icon="el-icon-back"
+          circle
+          @click="$router.push({ name: 'Customers' })"
+        ></el-button>
+        <h1 style="display: inline-block; margin: 0 0 0 10px">
+          <i class="el-icon-edit-outline"></i> {{ (routeUser?.name || 'Cari').toUpperCase() }} - Cari Ekstreleri
+        </h1>
+      </div>
       <div class="header-actions">
         <el-button
           v-if="!routeUser?.isRetail"
@@ -22,43 +29,7 @@
         >
       </div>
     </div>
-
-    <!-- 
-
-      POST (Yeni alım işlemi oluştur) payload 
-
-      {
-        "customerBalanceId": 12,
-        "transactionDateUtc": "2025-09-06T19:04:04.773Z",
-        "details": [
-          {
-            "productTypeId": 1,
-            "quantity": 10,
-            "weightKg": 2,
-            "isGrassy": false,
-            "type": "Salamura"
-          },
-          {
-            "productTypeId": 2,
-            "quantity": 5,
-            "weightKg": 1,
-            "isGrassy": true,
-            "type": "Tulum"
-          }
-        ]
-      }
-      
-      NOT
-      <ul>
-        <li>Müşteri Bilglieri</li>
-        <li>hangi tarihte</li>
-        <li>transaction ekranı ile birleştirilip işlem detayları da görünmeli / farklı ekranda da olabilir</li>
-        <li>anasayfadan gelindiğinde o sezonda müşterilerin yaptıığı işlemler görüntülenmeli. (season ile eşleştirilebilir ama db cariler içinde season bilgilsi tutmuyoruz. ve oluşturulma tarihine göre olursa yanıltıcı olabilir.)</li>
-        <li>yukarıdaki madde ile ilgili olarak db'e müşteri carilerine sezon bilgisi de geçilmeli. </li>
-        <li>müşteri carisi oluşturma için var olan düzenleme popupındaki detay bilgiler gizlenerek gösterilir.</li>
-      </ul>
-      <p>Müşteri ürün talebinde bulunduğunda carisinden, dolaylı yoldan ana stoktan düş.</p>
-     -->
+    
     <br />
 
     <!-- filter -->

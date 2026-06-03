@@ -24,6 +24,11 @@
       style="width: 100%"
       empty-text="Tedarikçi bulunamadı"
     >
+      <el-table-column prop="created_at" sortable label="Kayıt Tarihi" width="130">
+        <template v-slot="scope">
+          {{ scope.row.created_at | formatDate }}
+        </template>
+      </el-table-column>
       <el-table-column prop="full_name" sortable label="Ad Soyad"></el-table-column>
       <el-table-column prop="phone" sortable label="Telefon"></el-table-column>
       <el-table-column prop="address" sortable label="Adres"></el-table-column>
@@ -118,7 +123,7 @@
 <script>
 import { supabase } from '../utils/supabase'
 import globalMixin from '../mixin/global.mixin.js'
-import { formatNumber } from '../utils/helpers'
+import { formatNumber, formatDate } from '../utils/helpers'
 
 export default {
   name: 'Vendors',
@@ -156,7 +161,7 @@ export default {
       }
     }
   },
-  filters: { formatNumber },
+  filters: { formatNumber, formatDate },
   async mounted() {
     await this.getAllVendor()
   },
