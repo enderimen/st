@@ -1,7 +1,8 @@
-appId: com.electron.app
+appId: com.senkoylum.stoktakip
 productName: senkoylum-peynircilik
 directories:
   buildResources: build
+  output: dist_electron
 files:
   - '!**/.vscode/*'
   - '!src/*'
